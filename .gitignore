@@ -38,5 +38,6 @@ __pycache__/
 *.h5ad
 
 .Rproj.user/
+*.Rproj
 
 

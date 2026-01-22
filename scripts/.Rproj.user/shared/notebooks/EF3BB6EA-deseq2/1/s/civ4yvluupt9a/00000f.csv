@@ -1,3 +1,0 @@
-"0","libs <- c(""data.table"",""DESeq2"",""ggplot2"",""pheatmap"",""matrixStats"",""tximport"")"
-"0","invisible(lapply(libs, require, character.only = TRUE))"
-"0",""

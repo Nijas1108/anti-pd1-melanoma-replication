@@ -1,7 +1,0 @@
-"0","res_df <- as.data.frame(res)"
-"0","res_df$gene <- rownames(res_df)"
-"0",""
-"0","# Order by adjusted p-value"
-"0","res_df <- res_df[order(res_df$padj), ]"
-"0",""
-"0","head(res_df, 20)"
