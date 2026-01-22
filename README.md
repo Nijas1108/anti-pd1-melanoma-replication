@@ -40,6 +40,7 @@ The project reproduces and explores key RNA-seq and whole-exome sequencing (WES)
 ├── .gitignore
 └── README.md
 
+
 ---
 
 ## Analysis Overview
@@ -105,7 +106,6 @@ The repository is structured to allow full reproduction of results given access 
 ---
 
 ## Contributors
-
 
 This project was completed as a collaborative class assignment.
 
