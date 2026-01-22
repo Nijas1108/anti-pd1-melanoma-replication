@@ -39,7 +39,7 @@ The project reproduces and explores key RNA-seq and whole-exome sequencing (WES)
 │
 ├── .gitignore
 └── README.md
-
+```
 
 ---
 
