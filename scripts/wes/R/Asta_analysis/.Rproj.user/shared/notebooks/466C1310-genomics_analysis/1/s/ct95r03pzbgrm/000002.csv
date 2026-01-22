@@ -1,0 +1,26 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyAtLS0tIFJlYWQgY2xpbmljYWwgZGF0YSAtLS0tXG5jbGluaWNhbF9kZiA8LSByZWFkLmNzdihcIi4uL21tYzEuY3N2XCIsIHN0cmluZ3NBc0ZhY3RvcnMgPSBGQUxTRSlcblxuIyBSRU5BTUUgdGhlIElEIGNvbHVtbiB0byBtYXRjaCB0aGUgTUFGIHJlcXVpcmVtZW50XG4jIENoZWNrIHlvdXIgQ1NWOyBpZiB0aGUgY29sdW1uIGlzICdTYW1wbGUuSUQnLCB1c2UgdGhhdCBuYW1lIGhlcmU6XG5jb2xuYW1lcyhjbGluaWNhbF9kZilbY29sbmFtZXMoY2xpbmljYWxfZGYpID09IFwiU1JBLlJ1bi5JRC4udHVtb3IuV0VTXCJdIDwtIFwiVHVtb3JfU2FtcGxlX0JhcmNvZGVcIlxuY29sbmFtZXMoY2xpbmljYWxfZGYpW2NvbG5hbWVzKGNsaW5pY2FsX2RmKSA9PSBcIlNSQS5SdW4uSUQuLm5vcm1hbC5XRVNcIl0gPC0gXCJNYXRjaGVkX05vcm1fU2FtcGxlX0JhcmNvZGVcIlxuXG5gYGAifQ== -->
+
+```r
+# ---- Read clinical data ----
+clinical_df <- read.csv(\"../mmc1.csv\", stringsAsFactors = FALSE)
+
+# RENAME the ID column to match the MAF requirement
+# Check your CSV; if the column is 'Sample.ID', use that name here:
+colnames(clinical_df)[colnames(clinical_df) == \"SRA.Run.ID..tumor.WES\"] <- \"Tumor_Sample_Barcode\"
+colnames(clinical_df)[colnames(clinical_df) == \"SRA.Run.ID..normal.WES\"] <- \"Matched_Norm_Sample_Barcode\"
+
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+# ---- Read clinical data ----
+clinical_df <- read.csv(\"../mmc1.csv\", stringsAsFactors = FALSE)
+
+# RENAME the ID column to match the MAF requirement
+# Check your CSV; if the column is 'Sample.ID', use that name here:
+colnames(clinical_df)[colnames(clinical_df) == \"SRA.Run.ID..tumor.WES\"] <- \"Tumor_Sample_Barcode\"
+colnames(clinical_df)[colnames(clinical_df) == \"SRA.Run.ID..normal.WES\"] <- \"Matched_Norm_Sample_Barcode\"
+
+```"

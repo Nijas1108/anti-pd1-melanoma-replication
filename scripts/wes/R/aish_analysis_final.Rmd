@@ -1,0 +1,832 @@
+---
+title: "Genomics_Analysis_Final"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## LOADING LIBRARIES: 
+```{r}
+library(maftools)
+library(dplyr)
+library(tidyr)
+library(survival)
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(ggrepel)
+
+```
+
+## LOAD IN MMC1 METADATA:
+```{r, eval=FALSE}
+# Read clinical metadata into a datafram
+clinical_df_og <- read.csv("mmc1.csv", stringsAsFactors = FALSE)
+
+# Rename the sample ID column to match the MAF sample ID column (Sample_Barcode) - required when merging data with MAF
+# Check CSV and use the name of the column here:
+colnames(clinical_df_og)[colnames(clinical_df_og) == "SRA.Run.ID..tumor.WES"] <- "Tumor_Sample_Barcode"
+colnames(clinical_df_og)[colnames(clinical_df_og) == "SRA.Run.ID..normal.WES"] <- "Matched_Norm_Sample_Barcode"
+```
+
+## LOADING IN MAF FILES: 
+```{r, eval=FALSE}
+# 1. Define the two directories
+ucla_dir <- "/rds/projects/e/elhamsak-group5/main_project/processed_data/wes/annotation/ucla_processed_bed"
+vandy_dir <- "/rds/projects/e/elhamsak-group5/main_project/processed_data/wes/annotation/vanderbilt_processed_bed" 
+
+# Collect all MAF files
+maf_files <- c(
+  list.files(ucla_dir,  pattern = "\\.maf$", full.names = TRUE),
+  list.files(vandy_dir, pattern = "\\.maf$", full.names = TRUE)
+)
+
+cat("Total MAF files found:", length(maf_files), "\n")
+```
+
+## COMBINING ALL MAFS
+```{r, eval = FALSE}
+# Process each MAF
+all_mafs_list <- lapply(maf_files, function(file_path) {
+  
+  dat <- read.delim(file_path, comment.char = "#", stringsAsFactors = FALSE)
+  
+  # Replacing UNKNOWN in Sample_Barcode with Run ID
+  fname <- basename(file_path) # Extract both IDs from filename
+  # removes everything starting from the first dot and split by "_vs_"
+  ids <- unlist(strsplit(clean_name <- gsub("\\..*", "", fname), "_vs_"))
+  
+  tumor_id  <- ids[1]
+  normal_id <- ids[2]
+  
+  # Replace BOTH barcodes
+  dat$Tumor_Sample_Barcode  <- tumor_id
+  dat$Matched_Norm_Sample_Barcode <- normal_id
+  
+  # Track cohort source
+  dat$Cohort <- ifelse(grepl("UCLA", file_path),
+                       "UCLA",
+                       "VANDERBILT")
+  return(dat)
+})
+
+# Combine all MAFs
+combined_df <- do.call(rbind, all_mafs_list)
+cat("Total variants after merge:", nrow(combined_df), "\n")
+```
+
+## MERGING MMC1 METADATA WITH combined_df: 
+```{r, eval=FALSE}
+# Build MAF object to contain both maf and clinical data
+merged_maf <- read.maf(maf = combined_df,
+                       clinicalData = clinical_df_og)
+
+# Check summary
+getSampleSummary(merged_maf)
+```
+## Checking to see whether we can call specific records from merged_maf
+```{r}
+# Filter clinical data for sample SRR4289724
+sample_clinical <- subset(getClinicalData(merged_maf),
+                          Matched_Norm_Sample_Barcode == "SRR4289724")
+print(sample_clinical)
+```
+
+```{r}
+# checking possible variant_types
+unique(merged_maf@data$Variant_Type)
+```
+```{r}
+# checking possible Variant_Classification
+unique(merged_maf@data$Variant_Classification)
+```
+
+## SavE data to use on VLab:
+```{r}
+# # Save as an RDS file for R
+saveRDS(merged_maf, file = "/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/merged_maf.rds")
+
+# # open in Vlab with: 
+# merged_maf <- readRDS("~/module3_genomics_and_ngs/project_analysis/merged_maf.rds")
+```
+
+## CALCULATING NUMBER OF NON-SYNONYMOUS MUTATIONS:
+
+```{r}
+nsSNV_classes <- c(
+  "Missense_Mutation", "Nonsense_Mutation",
+  "Nonstop_Mutation", "Splice_Site",
+  "Translation_Start_Site"
+)
+
+ns_nonsilent_classes <- c(
+  nsSNV_classes,
+  "Frame_Shift_Del", "Frame_Shift_Ins",
+  "In_Frame_Del", "In_Frame_Ins"
+)
+
+# Calculating only SNV counts
+nsSNV_counts <- merged_maf@data %>%
+  filter(Variant_Type == "SNP", 
+         Variant_Classification %in% nsSNV_classes) %>%
+  count(Tumor_Sample_Barcode, name = "nsSNV")
+
+# Calculating all non-silent variants
+non_silent_counts <- merged_maf@data %>%
+  filter(Variant_Classification %in% ns_nonsilent_classes) %>%
+  count(Tumor_Sample_Barcode, name = "all_nonsilent_vars")
+
+# adding counts from author data for validation
+# Load author data
+author_data <- read.csv("Snv_counts.csv", stringsAsFactors = FALSE)
+
+# Map Patient.ID to Tumor_Sample_Barcode using your clinical metadata
+author_data_mapped <- author_data %>%
+  left_join(
+    clinical_df_og %>% select(Tumor_Sample_Barcode, Patient.ID),
+    by = "Patient.ID"
+  ) %>%
+  # Keep only columns we need for TMB calculation
+  select(Tumor_Sample_Barcode, TotalNonSyn, TotalNonSyn_Exp)
+```
+
+## CALCULATING TMB:
+```{r}
+# 1. Load callable base summary
+# Format: Tumor_Sample_Barcode, Matched_Norm_Sample_Barcode, Total_Bases, Total_MB
+tmb_df <- read.delim("all_samples_callable_bases.txt",
+                          header = FALSE, stringsAsFactors = FALSE)
+colnames(tmb_df) <- c("Tumor_Sample_Barcode", "Matched_Norm_Sample_Barcode", "Total_Bases", "Callable_Mb")
+
+# Optional: filter out low coverage samples
+min_callable_mb <- 50
+tmb_df <- tmb_df %>% filter(Callable_Mb >= min_callable_mb)
+
+# 2. Merge nsSNV and non-silent variant counts
+tmb_df <- tmb_df %>%
+  left_join(nsSNV_counts, by = "Tumor_Sample_Barcode") %>%
+  left_join(non_silent_counts, by = "Tumor_Sample_Barcode")
+
+# 3. Merge author data
+tmb_df <- tmb_df %>%
+  left_join(author_data_mapped, by = "Tumor_Sample_Barcode")
+
+# 4. Calculate TMB
+# TMB = nsSNV / Callable Mb
+tmb_df <- tmb_df %>%
+  mutate(TMB = nsSNV / Callable_Mb)
+
+# 5. Rearrange columns
+tmb_df <- tmb_df %>%
+  select(
+    Tumor_Sample_Barcode,
+    Matched_Norm_Sample_Barcode,
+    nsSNV,
+    all_nonsilent_vars,
+    TotalNonSyn,
+    TotalNonSyn_Exp,
+    Total_Bases,
+    Callable_Mb,
+    TMB
+  )
+
+# 6. Inspect
+head(tmb_df)
+
+```
+
+```{r}
+# Visualising TMB:
+# Create the mapping table from the clinical data inside the MAF object
+mapping_table <- merged_maf@clinical.data %>%
+  # Select the two columns needed for mapping
+  dplyr::select(Tumor_Sample_Barcode, Patient.ID) %>%
+  # Remove any duplicates to ensure a 1-to-1 mapping
+  dplyr::distinct()
+
+# 1. Join TMB data with Patient IDs
+tmb_plot_data <- tmb_df %>%
+  left_join(mapping_table, by = "Tumor_Sample_Barcode") %>%
+  # Filter out samples that don't have a matching Patient ID or TMB
+  filter(!is.na(Patient.ID), !is.na(TMB))
+
+# 2. Generate the Barplot
+tmb_per_patient_plot <- ggplot(tmb_plot_data, aes(x = reorder(Patient.ID, -TMB), y = TMB)) +
+  geom_bar(stat = "identity", fill = "firebrick") +
+  theme_minimal() +
+  labs(title = "Tumor Mutational Burden per Sample",
+       subtitle = "Calculated as nsSNV per Callable Mb",
+       x = "Patient ID",
+       y = "TMB (nsSNV / Callable Mb)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("/rds/projects/e/elhamsak-group5/main_project/figures/WES/tmb_per_patient.png", plot = tmb_per_patient_plot, width = 10, height = 6, dpi = 300)
+
+# Histogram of TMB distribution
+tmb_dist <- ggplot(tmb_plot_data, aes(x = TMB)) +
+  geom_histogram(bins = 15, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Distribution of TMB across Cohort",
+       x = "TMB (Mutations/Mb)",
+       y = "Frequency (Number of Patients)")
+ggsave("/rds/projects/e/elhamsak-group5/main_project/figures/WES/tmb_distribution.png", plot = tmb_dist, width = 10, height = 6, dpi = 300)
+```
+
+## Removing outlier Pt8:
+```{r}
+
+# 1. Get the list of samples with > 10,000 mutations
+sample_summary <- getSampleSummary(merged_maf)
+outlier_samples <- sample_summary[total > 10000, Tumor_Sample_Barcode]
+
+# 2. Subset the MAF to exclude these samples
+# Note: we use subsetMaf with the 'query' argument or by providing the list of 'tsb' to keep/remove
+# To remove specific barcodes, filterMaf is usually cleaner:
+filtered_maf <- filterMaf(maf = merged_maf, tsb = outlier_samples)
+
+filtered_tmb_plot_data <- tmb_plot_data <- tmb_df %>%
+  left_join(mapping_table, by = "Tumor_Sample_Barcode") %>%
+  # Filter out NA values AND remove Patient ID "Pt8"
+  filter(!is.na(Patient.ID), 
+         !is.na(TMB), 
+         Patient.ID != "Pt8")
+```
+
+# Plot a general summary:
+```{r}
+# Example of defining custom colors
+oncoplot_col = c("Missense_Mutation" = "green4", "Nonsense_Mutation" = "red", "Frame_Shift_Del" = "black", "Frame_Shift_In" = "steelblue", "In_Frame_Del" = "darkgrey", "In_Frame_Ins" = "lightblue", "Nonstop_Mutation" = "gold", "Splice_Site" ="orange")
+
+# Apply to oncoplot
+
+# This shows TMB distribution and the most frequently mutated genes
+# png("/rds/projects/e/elhamsak-group5/main_project/figures/WES/MAF_summary.png", width = 1600, height = 1000, res = 300)
+# par(mar = c(2, 2, 2, 2))
+# plotmafSummary(maf = filtered_maf, rmOutlier = TRUE, addStat = 'median', dashboard = TRUE, color = oncoplot_col, textSize=1, type = "cairo")
+# dev.off()
+
+pdf("/rds/projects/e/elhamsak-group5/main_project/figures/WES/MAF_summary.pdf", width = 10, height = 7)
+plotmafSummary(maf = filtered_maf, rmOutlier = TRUE, addStat = 'median', dashboard = TRUE, color = oncoplot_col)
+dev.off()
+```
+```{r}
+
+# 4. Generate the Oncoplot (Waterfall Plot)
+# This is the most important plot to see which genes are hit most often
+pdf("/rds/projects/e/elhamsak-group5/main_project/figures/WES/oncoplot_top_20_genes.pdf", width = 10, height = 7)
+oncoplot(maf = filtered_maf, top = 20, showTumorSampleBarcodes = TRUE, colors = oncoplot_col)
+dev.off()
+```
+
+## PLOTTING FROM A LIST OF GENES (GOTTEN FROM FISHER TEST) that seem interesting: 
+```{r}
+# Find genes that are significantly clustered (potential drivers)
+# drivers <- oncodrive(maf = filtered_maf, AACol = 'Protein_Change', minMut = 5)
+# since FDR is flat, try defining known drivers
+```
+
+## same as above but with patient ID:
+
+```{r}
+# 1. Prepare the mapping table
+mapping_table <- merged_maf@clinical.data %>%
+  select(Tumor_Sample_Barcode, Patient.ID) %>%
+  distinct()
+
+# 2. Update the data frames OUTSIDE the MAF object first
+maf_data_for_plot <- filtered_maf@data %>%
+  left_join(mapping_table, by = "Tumor_Sample_Barcode") %>%
+  mutate(Tumor_Sample_Barcode = Patient.ID) %>%
+  select(-Patient.ID)
+
+maf_clinical_for_plot <- merged_maf@clinical.data %>%
+  mutate(Tumor_Sample_Barcode = Patient.ID) %>%
+  mutate(Response_Group = case_when(
+    irRECIST %in% c("Complete Response", "Partial Response") ~ "Responder",
+    irRECIST %in% c("Progressive Disease") ~ "Non-Responder"
+  )) %>%
+  distinct(Tumor_Sample_Barcode, .keep_all = TRUE) # This keeps only the first occurrence of Pt27
+
+# 3. Rebuild the MAF object so it recognizes the new column
+plot_maf_final <- read.maf(maf = maf_data_for_plot, clinicalData = maf_clinical_for_plot)
+
+# 4. Plot
+# Define list of genes to analyse (output from Fisher's test): 
+diff_genes <- c("ABCA7", "ADAMTSL2", "COL4A3", "CR1", "CSMD2", "DCHS2", 
+                "DSP", "FMO1", "FREM1", "FREM2", "FRY", "GRIN2B", "ITGA9",
+                "KALRN", "LRP2", "MDN1", "MROH2B", "PTPRT", "RELN", "SCN5A",
+                "SORCS3", "TENM3", "TRPM2", "USP6", "ZNF804A")
+
+pdf("/rds/projects/e/elhamsak-group5/main_project/figures/WES/oncoplot_selected_genes_from_fishers.pdf", width = 10, height = 7)
+oncoplot(
+  maf = plot_maf_final,
+  genes = diff_genes,
+  clinicalFeatures = "Response_Group", 
+  showTumorSampleBarcodes = TRUE,
+  # Ensure your annotation table uses the NEW Patient IDs as Tumor_Sample_Barcode
+  annotationDat = maf_clinical_for_plot, 
+  sortByAnnotation = TRUE, 
+  fontSize = 0.5
+)
+dev.off()
+```
+
+## Extract the numerical frequency data:
+```{r}
+# This creates a table of genes ranked by how many samples they appear in
+gene_stats <- getGeneSummary(filtered_maf)
+head(gene_stats, 10) # Shows Hugo_Symbol, Missense_Mutation, Nonsense_Mutation, Total, etc.
+```
+
+
+```{r}
+# # Lollipop Plot for a specific gene (e.g., BRAF)
+# # This shows WHERE on the protein the mutations are occurring
+# lollipopPlot(maf = filtered_maf, gene = 'BRAF', AACol = 'Protein_Change', showMutationRate = TRUE)
+```
+
+## COLLECTING DATA FOR PLOTTING FIG 1C AND 1D:
+Need to make a df containing the columns:
+1. Patient.ID (Pt1, Pt2, etc)
+2. irRECIST ("Progressive Disease", "Partial Response", "Complete Response") -> (Responding, Non-responding)
+3. Overall.Survival (days of survival)
+4. Vital.Status (Dead or Alive)
+5. number of non-synonymous mutations (need to calculate)
+6. TMB (High, Low)
+
+```{r}
+# 1. Start with clinical data
+plot_df <- getClinicalData(filtered_maf) %>%
+  select(Patient.ID, Tumor_Sample_Barcode, Matched_Norm_Sample_Barcode,
+         irRECIST, Overall.Survival, Vital.Status)
+
+# 2. Join the TMB table for mutation counts and calculated TMB
+plot_df <- plot_df %>%
+  left_join(
+    filtered_tmb_plot_data %>%
+      select(Tumor_Sample_Barcode, nsSNV, all_nonsilent_vars, 
+             TotalNonSyn, TotalNonSyn_Exp, Callable_Mb, TMB),
+    by = "Tumor_Sample_Barcode"
+  )
+
+# 4. Handle NAs for samples with zero mutations
+plot_df <- plot_df %>%
+  mutate(across(c(nsSNV, all_nonsilent_vars, TotalNonSyn, TotalNonSyn_Exp, TMB),
+                ~replace_na(.x, 0)))
+
+# 5. Define Response Factor for plotting
+plot_df <- plot_df %>%
+  mutate(Response = case_when(
+    irRECIST %in% c("Complete Response", "Partial Response") ~ "Responding",
+    irRECIST == "Progressive Disease" ~ "Non-responding",
+    TRUE ~ "Other"
+  ))
+
+# # 6. Optional: Filter extreme outliers (Pt8)
+# plot_df_filtered <- plot_df %>%
+#   filter(nsSNV < 10000)
+
+plot_df
+```
+
+## CREATING THE PLOT 1C USING ONLY NS SNV COUNTS: 
+```{r}
+# 1. Prepare the dataframe
+# We use 'nsSNV' because using TMB does not make a difference in this case. 
+plot_data_1c <- plot_df %>%
+  group_by(Response) %>%
+  mutate(
+    group_median = median(nsSNV, na.rm = TRUE), 
+    Load_Level = ifelse(nsSNV >= group_median, "high nsSNV", "low nsSNV"),
+    Group_Label = paste(Response, Load_Level, sep = "\n")
+  ) %>%
+  ungroup()
+
+# 2. Fix X-axis order and labels to match your specific 'case_when' logic
+# Note: Your case_when used "Responding" and "Non-responding"
+plot_data_1c$Group_Label <- factor(plot_data_1c$Group_Label, levels = c(
+  "Responding\nhigh nsSNV", 
+  "Responding\nlow nsSNV", 
+  "Non-responding\nhigh nsSNV", 
+  "Non-responding\nlow nsSNV"
+))
+
+# 3. Create the Plot
+p1c <- ggplot(plot_data_1c, aes(x = Group_Label, y = nsSNV / 1000)) +
+  geom_boxplot(outlier.shape = NA, width = 0.4, color = "black") +
+  geom_jitter(width = 0.1, alpha = 0.7, color = "red3") + 
+  theme_bw() +
+  theme(panel.grid = element_blank(), 
+        axis.text.x = element_text(size = 10)) +
+  labs(y = "Somatic nsSNVs (in 1000s)", x = "", title = "Figure 1C (ns variants counts)") +
+  geom_signif(
+    comparisons = list(c("Responding\nhigh nsSNV", "Non-responding\nhigh nsSNV")),
+    test = "wilcox.test",
+    map_signif_level = function(p) sprintf("p-value = %.2g", p),
+    textsize = 4
+  )
+
+# 4. Save
+ggsave("/rds/projects/e/elhamsak-group5/main_project/figures/WES/Figure_1C.png", plot = p1c, width = 5.5, height = 5.5)
+
+```
+
+## CREATING THE PLOT 1C USING TMB:  
+```{r}
+# # 1. Prepare the dataframe
+# # We use TMB
+# plot_data_1c_tmb <- fig1c_df_filtered %>%
+#   group_by(Response) %>%
+#   mutate(
+#     group_median = median(TMB, na.rm = TRUE), 
+#     Load_Level = ifelse(TMB >= group_median, "high TMB", "low TMB"),
+#     Group_Label = paste(Response, Load_Level, sep = "\n")
+#   ) %>%
+#   ungroup()
+# 
+# # 2. Fix X-axis order and labels to match your specific 'case_when' logic
+# # Note: Your case_when used "Responding" and "Non-responding"
+# plot_data_1c_tmb$Group_Label <- factor(plot_data_1c_tmb$Group_Label, 
+#                                        levels = c("Responding\nhigh TMB", 
+#                                                   "Responding\nlow TMB", 
+#                                                   "Non-responding\nhigh TMB", 
+#                                                   "Non-responding\nlow TMB"
+#                                                   )
+#                                        )
+# 
+# # 3. Create the Plot
+# p1c_tmb <- ggplot(plot_data_1c_tmb, aes(x = Group_Label, y = TMB)) +
+#   geom_boxplot(outlier.shape = NA, width = 0.4, color = "black") +
+#   geom_jitter(width = 0.1, alpha = 0.7, color = "red3") + 
+#   theme_bw() +
+#   theme(panel.grid = element_blank(), 
+#         axis.text.x = element_text(size = 10)) +
+#   labs(y = "TMB ", x = "", title = "Figure 1C (TMB Ratio)") +
+#   geom_signif(
+#     comparisons = list(c("Responding\nhigh TMB", "Non-responding\nhigh TMB")),
+#     test = "wilcox.test",
+#     map_signif_level = FALSE,
+#     textsize = 4
+#   )
+# 
+# # 4. Save
+# ggsave("/rds/projects/e/elhamsak-group5/main_project/figures/WES/Figure_1C_tmb.png", plot = p1c_tmb, width = 5.5, height = 5.5)
+# 
+# p1c_tmb
+```
+
+
+## COLLECTING DATA TO PLOT 1D (ONLY COUNTS)
+
+```{r}
+# 1. Clean the data and REMOVE the extreme outlier first
+plot_data_1d <- plot_data_1c %>%
+  group_by(Response) %>%
+  mutate(
+    # Calculate median
+    group_median = median(nsSNV, na.rm = TRUE), 
+    Load_Level = ifelse(nsSNV >= group_median, "high nsSNV", "low nsSNV"),
+    Group_Label = paste(Response, Load_Level, sep = "\n")
+  ) %>%
+  ungroup() %>%
+  mutate(
+    status_num = ifelse(Vital.Status == "Dead", 1, 0),
+    time_days = as.numeric(Overall.Survival)
+  )
+head(plot_data_1d)
+
+# 2. generate the survival fit
+fit_1d <- survfit(Surv(time_days, status_num) ~ Group_Label, data = plot_data_1d)
+fit_1d
+```
+
+## PLOTTING 1D USING ONLY NS SNV COUNTS: 
+```{r}
+# Define colors to match the paper
+surv_colors <- c(
+  "Non-responding\nhigh nsSNV" = "green3",
+  "Non-responding\nlow nsSNV" = "blue",     # yellow3 is easier to see on white
+  "Responding\nhigh nsSNV" = "red",
+  "Responding\nlow nsSNV" = "orange"
+)
+
+# Ensure the factor levels in your data match the colors
+plot_data_1d$Group_Label <- factor(plot_data_1d$Group_Label, 
+                                        levels = names(surv_colors))
+
+
+# Calculate p values
+# 1. Overall Log-Rank test (checks if ANY group is different)
+overall_diff <- survdiff(Surv(time_days, status_num) ~ Group_Label, data = plot_data_1d)
+overall_p <- 1 - pchisq(overall_diff$chisq, length(overall_diff$n) - 1)
+print(paste("Overall p-value:", round(overall_p, 4)))
+
+# 2. Pairwise comparison (Specific groups)
+# compare Responding High (Red) vs Non-Responding High (Green)
+p_orange_green <- survdiff(Surv(time_days, status_num) ~ Group_Label, 
+                           data = plot_data_1d %>% 
+                           filter(Group_Label %in% c("Responding\nlow nsSNV", "Non-responding\nhigh nsSNV")))
+p_orange_green <- 1 - pchisq(p_orange_green$chisq, 1)
+
+p_red_blue <- survdiff(Surv(time_days, status_num) ~ Group_Label, 
+                           data = plot_data_1d %>% 
+                           filter(Group_Label %in% c("Responding\nhigh nsSNV", "Non-responding\nlow nsSNV")))
+p_red_blue <- 1 - pchisq(p_red_blue$chisq, 1)
+
+
+pdf("/rds/projects/e/elhamsak-group5/main_project/figures/WES/Figure_1D.pdf", width = 10, height = 7)
+# 1. Setup the basic plot
+plot(fit_1d, 
+     col = surv_colors, # Order: Non-resp High, Non-resp Low, Resp High, Resp Low
+     lty = 2,               # Dashed lines
+     lwd = 2, 
+     xlab = "Time (Years)", 
+     ylab = "Fraction surviving",
+     xscale = 365.25,       # Convert days to years
+     mark.time = TRUE,      # Show the '+' marks for censored data
+     main = "Figure 1D")
+
+# 2. Add the legend manually
+legend("bottomright", 
+       legend = levels(plot_data_1d$Group_Label), 
+       col = surv_colors, 
+       lty = 2, 
+       bty = "n", 
+       cex = 1, 
+       y.intersp = 1.8)
+
+# 3. Add p-values:
+legend("topright", 
+       legend = c(paste("p (R low vs NR high)=", round(p_orange_green, 4), "\n", "p (R high vs NR low)=", round(p_red_blue, 4)), "Overall p < 0.001"), 
+       title = "Log-rank test",
+       bty = "n", 
+       cex = 0.9)
+
+dev.off()
+```
+
+
+
+
+## COLLECTING DATA TO PLOT 1D (TMB)
+
+```{r}
+# # 1. Clean the data and REMOVE the extreme outlier first
+# surv_df_1d_tmb <- plot_data_1c %>%
+#   filter(nsSNV < 10000) %>% # Remove the ~18k outlier
+#   filter(Response != "Other") %>% 
+#   group_by(Response) %>%
+#   mutate(
+#     # Recalculate median WITHOUT the outlier
+#     group_median = median(TMB, na.rm = TRUE), 
+#     Load_Level = ifelse(TMB >= group_median, "high TMB", "low TMB"),
+#     Group_Label = paste(Response, Load_Level, sep = "\n")
+#   ) %>%
+#   ungroup() %>%
+#   mutate(
+#     status_num = ifelse(Vital.Status == "Dead", 1, 0),
+#     time_years = as.numeric(Overall.Survival) / 365
+#   )
+# # head(surv_df_1d_tmb)
+# 
+# # 2. generate the survival fit
+# fit_1d_tmb <- survfit(Surv(time_years, status_num) ~ Group_Label, data = surv_df_1d_tmb)
+```
+
+## PLOTTING 1D USING TMB RATIO: 
+```{r}
+# # Calculate p values
+# # 1. Overall Log-Rank test (checks if ANY group is different)
+# overall_diff <- survdiff(Surv(time_years, status_num) ~ Group_Label, data = surv_df_1d_tmb)
+# overall_p <- 1 - pchisq(overall_diff$chisq, length(overall_diff$n) - 1)
+# print(paste("Overall p-value:", round(overall_p, 4)))
+# 
+# # 2. Pairwise comparison (Specific groups)
+# # compare Responding High (Red) vs Non-Responding High (Green)
+# p_orange_green <- survdiff(Surv(time_years, status_num) ~ Group_Label, 
+#                            data = surv_df_1d_tmb %>% 
+#                            filter(Group_Label %in% c("Responding\nlow TMB", "Non-responding\nhigh TMB")))
+# p_orange_green <- 1 - pchisq(p_orange_green$chisq, 1)
+# 
+# p_red_blue <- survdiff(Surv(time_years, status_num) ~ Group_Label, 
+#                            data = surv_df_1d_tmb %>% 
+#                            filter(Group_Label %in% c("Responding\nhigh TMB", "Non-responding\nlow TMB")))
+# p_red_blue <- 1 - pchisq(p_red_blue$chisq, 1)
+# 
+# 
+# png("Figure_1D_tmb.png", width = 2400, height = 2100, res = 300)
+# # 1. Setup the basic plot
+# plot(fit_1d_counts, 
+#      col = surv_colors, # Order: Non-resp High, Non-resp Low, Resp High, Resp Low
+#      lty = 2,               # Dashed lines
+#      lwd = 2, 
+#      xlab = "Time (Years)", 
+#      ylab = "Fraction surviving",
+#      xscale = 365.25,       # Convert days to years
+#      mark.time = TRUE,      # Show the '+' marks for censored data
+#      main = "Figure 1D (TMB ratio)")
+# 
+# # 2. Add the legend manually
+# legend("bottomright", 
+#        legend = levels(surv_df_1d_counts$Group_Label), 
+#        col = surv_colors, 
+#        lty = 2, 
+#        bty = "n", 
+#        cex = 1, 
+#        y.intersp = 1.8)
+# 
+# # 3. Add p-values:
+# legend("topright", 
+#        legend = c(paste("p (R low vs NR high)=", round(p_orange_green, 4), "\n", "p (R high vs NR low)=", round(p_red_blue, 4)), "Overall =", overall_p), 
+#        title = "Log-rank test",
+#        bty = "n", 
+#        cex = 0.9)
+# 
+# dev.off()
+# # p1d_tmb
+```
+
+
+## FIGURE 1G DATA PREPARATION:
+```{r}
+# Identify patients with BRCA2 mutations
+brca2_mutants <- merged_maf@data %>%
+  filter(Hugo_Symbol == "BRCA2") %>%
+  pull(Tumor_Sample_Barcode) %>%
+  unique()
+
+# Add BRCA2 status to your main clinical dataframe
+plot_data_1g <- plot_data_1c %>%
+  mutate(BRCA2_Status = ifelse(Tumor_Sample_Barcode %in% brca2_mutants, 
+                               "BRCA2 mutant", "BRCA2 WT")) %>%
+  # Filter to ensure we have the counts (using the nsSNV column we created earlier)
+  filter(!is.na(nsSNV))
+
+# # Filter the dataframe to remove the hypermutated outlier
+# fig1g_df_filtered <- fig1g_df %>%
+#   filter(nsSNV < 10000)
+
+# Fix the factor levels for the plot order
+plot_data_1g$BRCA2_Status <- factor(plot_data_1g$BRCA2_Status, 
+                                levels = c("BRCA2 WT", "BRCA2 mutant"))
+```
+
+
+## CREATING PLOT 1G (SNV counts)
+```{r}
+p1g <- ggplot(plot_data_1g, aes(x = BRCA2_Status, y = nsSNV / 1000)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5) +
+  geom_jitter(width = 0.1, color = "firebrick", alpha = 0.6) +
+  theme_classic() +
+  labs(
+    y = "Somatic nsSNVs (in 1000s)",
+    x = "",
+    title = "Figure 1G: Mutational Load in BRCA2 Mutants"
+  ) +
+  # Use stat_compare_means for the Mann-Whitney test p-value
+  stat_compare_means(
+    method = "wilcox.test", 
+    label.x = 1.5, 
+    label.y = 3.2,
+    label = "p.format"
+  ) +
+  # Optional: Match the sample counts in the X-axis labels
+  scale_x_discrete(labels = c(
+    "BRCA2 WT\n(n=31)", 
+    "BRCA2 mutant\n(n=7)"
+  ))
+
+# Save the plot
+ggsave("/rds/projects/e/elhamsak-group5/main_project/figures/WES/Figure_1G_BRCA2.png", plot = p1g, width = 6, height = 6)
+```
+
+## CREATING PLOT IG (TMB ratio)
+```{r}
+# p1g <- ggplot(plot_data_1g, aes(x = BRCA2_Status, y = TMB)) +
+#   geom_boxplot(outlier.shape = NA, width = 0.5) +
+#   geom_jitter(width = 0.1, color = "firebrick", alpha = 0.6) +
+#   theme_classic() +
+#   labs(
+#     y = "TMB",
+#     x = "",
+#     title = "Figure 1G: Mutational Load in BRCA2 Mutants"
+#   ) +
+#   # Use stat_compare_means for the Mann-Whitney test p-value
+#   stat_compare_means(
+#     method = "wilcox.test", 
+#     label.x = 1.5, 
+#     label.y = 3.2,
+#     label = "p.format"
+#   ) +
+#   # Optional: Match the sample counts in the X-axis labels
+#   scale_x_discrete(labels = c(
+#     "BRCA2 WT\n(n=31)", 
+#     "BRCA2 mutant\n(n=7)"
+#   ))
+# 
+# # Save the plot
+# ggsave("/rds/projects/e/elhamsak-group5/main_project/figures/WES/Figure_1G_BRCA2.png", plot = p1g, width = 6, height = 6)
+```
+
+
+## FIGURE 1E:
+```{r}
+# 1. Identify barcodes for Responding patients
+res_barcodes <- merged_maf@clinical.data %>%
+  filter(irRECIST %in% c('Partial Response', 'Complete Response')) %>%
+  pull(Tumor_Sample_Barcode)
+
+# 2. Identify barcodes for Non-responding patients
+nonres_barcodes <- merged_maf@clinical.data %>%
+  filter(irRECIST == 'Progressive Disease') %>%
+  pull(Tumor_Sample_Barcode)
+
+# 3. Create the subsetted MAF objects using the 'tsbs' argument
+res_maf <- subsetMaf(maf = merged_maf, tsb = res_barcodes)
+nonres_maf <- subsetMaf(maf = merged_maf, tsb = nonres_barcodes)
+
+# 4. Run the comparison (Fisher's Exact Test)
+comp <- mafCompare(m1 = res_maf, m2 = nonres_maf, 
+                   m1Name = 'Responding', m2Name = 'Non-responding')
+
+print(comp$results)
+```
+
+## CREATING PLOT:
+```{r}
+# Define the gene list exactly as in the paper
+target_genes <- c("BRAF", "NRAS", "NF1", "FREM1", "OR13C5", "FMO1", "UTRN", 
+                  "LPHN3", "SP140L", "ITGA9", "ABCA7", "OR10J1", "MUC12", 
+                  "ZNF534", "AMER3", "BRCA2", "TRPM2", "CLEC14A")
+
+# Generate the OncoPrint
+
+# Define colors to match the image
+# Note: Ensure the names match your MAF 'Variant_Classification' or 'Type'
+vc_cols <- c(
+  "SNP" = "lightblue",
+  "Missense_Mutation" = "pink2", 
+  "Nonsense_Mutation" = "pink2",
+  "Nonstop_Mutation" = "#FFFF33",
+  "Splice_Site" = "green3",
+  "Translation_Start_Site" = "green3"
+)
+
+# 1. Create a mapping table from your clinical data
+# This links the SRR (Tumor_Sample_Barcode) to the "PtX" ID
+mapping_table <- merged_maf@clinical.data %>%
+  select(Tumor_Sample_Barcode, Patient.ID) %>%
+  distinct(Patient.ID, .keep_all = TRUE) # Handle the Pt27 duplicate issue
+
+# 2. Merge Patient.ID into your tmb_df
+# We assume tmb_df has a column named "Tumor_Sample_Barcode" (the SRR IDs)
+tmb_with_ids <- tmb_df %>%
+  inner_join(mapping_table, by = "Tumor_Sample_Barcode") %>%
+  select(Patient.ID, TMB) # Now we have the "PtX" labels alongside TMB
+
+# 3. Prepare the 2-column data frame for oncoplot
+# Columns MUST be named exactly like this
+tmb_for_plot <- tmb_with_ids %>%
+  rename(Tumor_Sample_Barcode = Patient.ID) %>%
+  select(Tumor_Sample_Barcode, TMB)
+
+# 1. Identify which patients actually have TMB data
+# (Exclude the one that was filtered out)
+patients_to_keep <- tmb_with_ids$Patient.ID
+
+# 2. Subset the MAF object to only include these patients
+# This removes the "Missing column" warning by removing the sample itself
+plot_maf_final <- subsetMaf(maf = plot_maf_final, tsb = patients_to_keep)
+
+# 3. Ensure the TMB data frame only has these patients (just to be safe)
+tmb_final_df <- tmb_for_plot %>%
+  filter(Tumor_Sample_Barcode %in% patients_to_keep)
+
+# 4. Generate the Plot
+pdf("/rds/projects/e/elhamsak-group5/main_project/figures/WES/Figure_1E_OncoPrint.pdf", width = 10, height = 7)
+
+oncoplot(
+  maf = plot_maf_final,
+  genes = target_genes,
+  clinicalFeatures = 'Response_Group',
+  sortByAnnotation = TRUE,
+  
+  # The external TMB data linked by Patient ID
+  topBarData = tmb_for_plot, 
+  
+  colors = vc_cols,
+  bgCol = "lightgrey",
+  borderCol = "white",
+  annotationColor = list(Response_Group = c("Responder" = "black", "Non-responder" = "grey")),
+  showTumorSampleBarcodes = TRUE,
+  barcode_mar = 6,
+  gene_mar = 10,
+  fontSize = 1.2,
+  SampleNamefontSize = 1.2
+)
+
+dev.off()
+```
+
+

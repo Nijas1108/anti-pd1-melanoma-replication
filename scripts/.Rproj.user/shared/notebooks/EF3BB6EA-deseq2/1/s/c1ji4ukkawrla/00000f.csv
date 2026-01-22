@@ -1,0 +1,3 @@
+"0","mat_z <- t(scale(t(mat)))"
+"0","mat_z[is.na(mat_z)] <- 0"
+"0",""

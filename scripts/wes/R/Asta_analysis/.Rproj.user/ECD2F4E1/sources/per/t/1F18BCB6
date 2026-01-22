@@ -1,0 +1,27 @@
+{
+    "id": "1F18BCB6",
+    "path": "/rds/projects/e/elhamsak-group5/main_project/genomics_analysis/Asta_analysis/genomics_analysis.Rmd",
+    "project_path": "genomics_analysis.Rmd",
+    "type": "r_markdown",
+    "hash": "2004918995",
+    "contents": "",
+    "dirty": false,
+    "created": 1768551518700.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "chunk_output_type": "inline",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "286,0",
+        "scrollLine": "283"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1768546305,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1768546305,
+    "read_only": false,
+    "read_only_alternatives": []
+}

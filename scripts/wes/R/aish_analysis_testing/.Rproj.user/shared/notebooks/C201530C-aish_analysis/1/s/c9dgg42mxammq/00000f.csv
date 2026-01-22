@@ -1,0 +1,7 @@
+"0","# Read clinical metadata into a datafram"
+"0","clinical_df_og <- read.csv(""mmc1.csv"", stringsAsFactors = FALSE)"
+"0",""
+"0","# Rename the sample ID column to match the MAF sample ID column (Sample_Barcode) - required when merging data with MAF"
+"0","# Check CSV and use the name of the column here:"
+"0","colnames(clinical_df_og)[colnames(clinical_df_og) == ""SRA.Run.ID..tumor.WES""] <- ""Tumor_Sample_Barcode"""
+"0","colnames(clinical_df_og)[colnames(clinical_df_og) == ""SRA.Run.ID..normal.WES""] <- ""Matched_Norm_Sample_Barcode"""

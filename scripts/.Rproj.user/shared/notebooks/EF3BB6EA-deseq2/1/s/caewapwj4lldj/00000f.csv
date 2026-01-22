@@ -1,0 +1,8 @@
+"0","library(rstatix)"
+"0",""
+"0","pvals <- plot_long %>%"
+"0","  group_by(gene) %>%"
+"0","  wilcox_test(expr ~ response) %>%"
+"0","  mutate(p_label = paste0(""p="", signif(p, 2))) %>%"
+"0","  select(gene, p_label)"
+"0",""

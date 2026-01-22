@@ -1,0 +1,231 @@
+.
+├── data
+│   ├── rnaseq
+│   │   ├── rnaseq_data.sh
+│   │   ├── also contains for each sample: 
+│   │   ├   ── sample_ID
+│   │   │      └── sample_ID.sra
+│   │   ├   ── sample_ID_1.fastq.gz
+│   │   └   ── sample_ID_2.fastq.gz
+│   │   
+│   ├── UCLA_samples
+│   │   ├── paper_samples.txt
+│   │   ├── UCLA_samples_download.sh
+│   │   ├── wget-log
+│   │   └── also contains for each sample: 
+│   │       ── sample_ID_1.fastq.gz 
+│   │       └─ sample_ID_2.fastq.gz
+│   │  
+│   └── vanderbilt_samples
+│       ├── paper_samples.txt
+│       ├── vanderbilt_samples_download.sh
+│       └── also contains for each sample: 
+│           ── sample_ID_1.fastq.gz
+│           ── sample_ID_2.fastq.gz
+│  
+├── figures
+│   ├── rnaseq
+│   │   └── contains figures and plots generated during RNA-seq analysis
+│   └── WES
+│       └── contains figures and plots generated during WES analysis
+│   
+├── processed_data
+│   ├── aligned_files
+│   │   ├── rnaseq
+│   │   │   ├── contains for each sample:
+│   │   │   ├   ── sample_ID_Aligned.sortedByCoord.out.bam
+│   │   │   ├   ── sample_ID_Aligned.sortedByCoord.out.bam.bai
+│   │   │   ├   ── sample_ID_Log.final.out
+│   │   │   ├   ── sample_ID_Log.out
+│   │   │   ├   ── sample_ID_Log.progress.out
+│   │   │   ├   ── sample_ID_ReadsPerGene.out.tab
+│   │   │   ├   ── sample_ID_SJ.out.tab
+│   │   │   ├   ── sample_ID__STARgenome
+│   │   │   │      ├── sjdbInfo.txt
+│   │   │   │      └── sjdbList.out.tab
+│   │   │   └   ── sample_ID__STARpass1
+│   │   │           ├── Log.final.out
+│   │   │           └── SJ.out.tab
+│   │   │   
+│   │   ├── UCLA_samples
+│   │   │   ├── processed_bams
+│   │   │   │   ├── all_dup_metrics.txt
+│   │   │   │   ├── also contains for each sample:
+│   │   │   │   ├   ── sample_ID_dup_metrics.txt
+│   │   │   │   ├   ── sample_ID.final.bai
+│   │   │   │   ├   ── sample_ID.final.bam
+│   │   │   │   └   ── sample_ID_recal_data.table
+│   │   │   ├── also contains for each sample:
+│   │   │   ├   ── sample_ID.sorted.bam
+│   │   │   └   ── sample_ID.sorted.bam.bai
+│   │   │
+│   │   └── vanderbilt_samples
+│   │       ├── processed_bams
+│   │       │   ├── contains for each sample:
+│   │       │   ├   ── sample_ID_dup_metrics.txt
+│   │       │   ├   ── sample_ID.final.bai
+│   │       │   ├   ── sample_ID.final.bam
+│   │       │   └   ── sample_ID_recal_data.table
+│   │       ├── also contains for each sample:
+│   │       ├   ── sample_ID.sorted.bam
+│   │       └   ── sample_ID.sorted.bam.bai
+│   │   
+│   ├── rna_seq
+│   │   ├── cibersortx
+│   │   │   ├── CIBERSORTx_input.txt
+│   │   │   └── CIBERSORTx_Results.csv
+│   │   ├── meta_data
+│   │   │   ├── os_survival.csv
+│   │   │   └── SraRunTable.csv
+│   │   └── rnaseq_counts
+│   │       ├── gene_counts.txt
+│   │       └── gene_counts.txt.summary
+│   │  
+│   ├── trimmed_files
+│   │   ├── rnaseq
+│   │   │   ├── contains for each sample:
+│   │   │   ├   ── sample_ID_1.trimmed.fastq.gz
+│   │   │   ├   ── sample_ID_2.trimmed.fastq.gz
+│   │   │   ├   ── sample_ID.fastp.html
+│   │   │   └   ── sample_ID.fastp.json
+│   │   │   
+│   │   ├── UCLA_samples
+│   │   │   ├── contains for each sample:
+│   │   │   ├   ── sample_ID_1.trimmed.fastq.gz
+│   │   │   ├   ── sample_ID_2.trimmed.fastq.gz
+│   │   │   ├   ── sample_ID.fastp.html
+│   │   │   └   ── sample_ID.fastp.json
+│   │   │   
+│   │   └── vanderbilt_samples
+│   │       ├── contains for each sample:
+│   │       ├   ── sample_ID_1.trimmed.fastq.gz
+│   │       ├   ── sample_ID_2.trimmed.fastq.gz
+│   │       ├   ── sample_ID.fastp.html
+│   │       └   ── sample_ID.fastp.json
+│   │  
+│   └── wes
+│       ├── annotation
+│       │   ├── ucla_processed_bed
+│       │   │   ├── contains for each tumour-normal sample:
+│       │   │   └   ── tumour_sample_ID_vs_normal_sample_ID.annotated.maf
+│       │   │  
+│       │   ├── UCLA_samples
+│       │   │   ├── contains for each tumour-normal sample:
+│       │   │   ├   ── tumour_sample_ID_vs_normal_sample_ID.annotated.vcf.gz
+│       │   │   └   ── tumour_sample_ID_vs_normal_sample_ID.annotated.vcf.gz.tbi
+│       │   │  
+│       │   ├── vanderbilt_pairs
+│       │   │   ├── contains for each tumour-normal sample:
+│       │   │   ├   ── tumour_sample_ID_vs_normal_sample_ID.annotated.vcf.gz
+│       │   │   └   ── tumour_sample_ID_vs_normal_sample_ID.annotated.vcf.gz.tbi
+│       │   │  
+│       │   └── vanderbilt_processed_bed
+│       │       ├── contains for each tumour-normal sample: 
+│       │       ├   ── tumour_sample_ID_vs_normal_sample_ID.annotated.maf
+│       │       ├   ── tumour_sample_IDvsnormal_sample_ID.annotated.vcf.gz
+│       │       └   ── tumour_sample_IDvsnormal_sample_ID.annotated.vcf.gz.tbi
+│       │   
+│       └── variant_calling
+│           ├── ucla_processed_bed
+│           │   └── contains for each tumour-normal sample:
+│           │       ── tumour_sample_ID_vs_normal_sample_ID
+│           │           ├── contamination.table
+│           │           ├── f1r2.tar.gz
+│           │           ├── filtered.PASS.chr.vcf.gz
+│           │           ├── filtered.PASS.chr.vcf.gz.tbi
+│           │           ├── filtered.PASS.vcf.gz
+│           │           ├── filtered.PASS.vcf.gz.tbi
+│           │           ├── filtered.vcf.gz
+│           │           ├── filtered.vcf.gz.filteringStats.tsv
+│           │           ├── filtered.vcf.gz.tbi
+│           │           ├── normal_pileups.table
+│           │           ├── read-orientation-model.tar.gz
+│           │           ├── segments.table
+│           │           ├── tumor_pileups.table
+│           │           ├── unfiltered.vcf.gz
+│           │           ├── unfiltered.vcf.gz.stats
+│           │           └── unfiltered.vcf.gz.tbi
+│           └── vanderbilt_processed_bed
+│               ├── renamestand.sh
+│               └── contains for each tumour-normal sample: 
+│                   ── tumour_sample_ID_vs_normal_sample_ID
+│                       ├── contamination.table
+│                       ├── f1r2.tar.gz
+│                       ├── filtered.PASS.chr.vcf.gz
+│                       ├── filtered.PASS.chr.vcf.gz.tbi
+│                       ├── filtered.PASS.vcf.gz
+│                       ├── filtered.PASS.vcf.gz.tbi
+│                       ├── filtered.vcf.gz
+│                       ├── filtered.vcf.gz.filteringStats.tsv
+│                       ├── filtered.vcf.gz.tbi
+│                       ├── normal_pileups.table
+│                       ├── read-orientation-model.tar.gz
+│                       ├── segments.table
+│                       ├── tumor_pileups.table
+│                       ├── unfiltered.vcf.gz
+│                       ├── unfiltered.vcf.gz.stats
+│                       └── unfiltered.vcf.gz.tbi
+│   
+├── README.txt
+│   
+├── reference_genome
+│   ├── funcotator
+│   │   └── contains data required for annotation with Funcotator
+│   ├── gnomAD
+│   │   └── contains data from gnomAD required for variant calling with Mutect2
+│   ├── hg38
+│   │   └── contains indexed reference genome
+│   ├── hg38_chr
+│   │   └── contains indexed reference genome with renamed contigs
+│   ├── nochr_to_chr.txt
+│   ├── STAR_index
+│   │   └── contains data required for alignment of RNA-seq data with STAR
+│   └── twist_exome_bed
+│       └── contains a standard .bed file identifying which regions of the exome are captured
+│   
+├── results
+│   ├── rnaseq
+│   │   └── contains data generated from RNA-seq analysis
+│   │  
+│   └── wes
+│       └── coverage_results
+│           └── contains data generated from genomic analysis
+│   
+└── scripts
+    ├── rnaseq
+    │   ├── bash
+    │   │   ├── 01_data_download_SRA.sh
+    │   │   ├── 02_fastp_trim.sh
+    │   │   ├── 03_star_index.sh
+    │   │   ├── 04_star_alignment.sh
+    │   │   └── 05_feature_counts.sh
+    │   └── R
+    │       ├── deseq2_final.Rmd
+    │       ├── deseq2.Rmd
+    │       ├── IPRES_scores.csv
+    │       └── normalized_counts_DESeq2.csv
+    └── wes
+        ├── bash
+        │   ├── 1_Fastp_wes.sh
+        │   ├── 2_Alignment.sh
+        │   ├── 3_Post_alignment_processing.sh
+        │   ├── 4_Variant_calling_Mutect2.sh
+        │   ├── 5_renaming_VCF_files.sh
+        │   ├── 6_Annotation_Funcotator.sh
+        │   ├── 7_Callable_Bases.sh
+        │   └── README.txt
+        └── R
+            ├── aish_analysis
+            ├── asta_analysis
+            ├── MOFA.Rmd
+            ├── MOFA.nb.html
+            ├── aish_analysis_testing
+            │   └   ── contains scripts testing the code
+            ├── Asta_analysis
+            │   └   ── contains scripts testing the code
+            ├── IPRES_scores.csv
+            ├── Melanoma_MOFA_Result.hdf5
+            ├── merged_maf.rds
+            ├── mmc1.csv
+            ├── normalized_counts_DESeq2.csv
+            └── Snv_counts.csv

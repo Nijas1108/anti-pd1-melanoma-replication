@@ -1,0 +1,17 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtbWFyeShkZnAkT1NfdGltZSlcblxuYGBgIn0= -->
+
+```r
+summary(dfp$OS_time)
+
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+summary(dfp$OS_time)
+
+```"
+"1","   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   54.0   334.5   577.5   647.2   945.8  2177.0 
+"

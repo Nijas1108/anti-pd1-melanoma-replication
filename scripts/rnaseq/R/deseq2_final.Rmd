@@ -1,0 +1,891 @@
+---
+title: "Differential Expression & Pathway Analysis (DESeq2)"
+authors: "Aishwarya, Asta, & Aman"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+set.seed(123)
+
+# File locations
+counts_path <- "/rds/projects/e/elhamsak-group5/main_project/processed_data/rna_seq/rnaseq_counts/gene_counts.txt"
+meta_path   <- "/rds/projects/e/elhamsak-group5/main_project/processed_data/rna_seq/meta_data/SraRunTable.csv"
+ciber_path  <- "/rds/projects/e/elhamsak-group5/main_project/processed_data/rna_seq/cibersortx/CIBERSORTx_Results.csv"
+
+# Output folder
+out_dir <- "/rds/projects/e/elhamsak-group5/main_project/figures/rnaseq"
+out_dir_results <- "/rds/projects/e/elhamsak-group5/main_project/results/rnaseq"
+
+# Analysis parameters
+min_count <- 10
+min_prop_samples <- 0.10
+alpha_fdr <- 0.10
+
+check_pkg <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    stop(
+      "Missing package: ", pkg, "\n",
+      "Install it, then re-knit.\n",
+      "CRAN: install.packages(\"", pkg, "\")\n",
+      "Bioconductor (if applicable): BiocManager::install(\"", pkg, "\")",
+      call. = FALSE
+    )
+  }
+}
+
+```
+
+# 1. Libraries
+
+```{r libraries}
+# Core
+pkgs <- c(
+  "data.table",
+  "DESeq2",
+  "ggplot2",
+  "pheatmap",
+  "matrixStats",
+  "dplyr",
+  "tidyr",
+  "AnnotationDbi",
+  "org.Hs.eg.db",
+  "msigdbr",
+  "GSVA",
+  "limma",
+  "ComplexHeatmap",
+  "circlize"
+)
+
+invisible(lapply(pkgs, check_pkg))
+invisible(lapply(pkgs, library, character.only = TRUE))
+```
+
+# 2. Load raw counts
+
+```{r load-counts}
+# Gene-level counts from featureCounts output
+fc <- fread(counts_path, skip = "#", data.table = FALSE)
+
+# Keep only Geneid + sample columns (drop Chr/Start/End/Strand/Length)
+count_matrix <- fc[, 7:ncol(fc)]
+rownames(count_matrix) <- fc$Geneid
+
+# Clean sample names (keep SRR... and remove BAM suffix)
+colnames(count_matrix) <- sub(
+  "_Aligned\\.sortedByCoord\\.out\\.bam$",
+  "",
+  basename(colnames(count_matrix))
+)
+
+count_matrix <- as.matrix(count_matrix)
+storage.mode(count_matrix) <- "integer"
+
+# Quick  checks
+dim(count_matrix)
+summary(colSums(count_matrix))
+
+# How many genes are expressed (>= min_count) in each sample?
+summary(colSums(count_matrix >= min_count))
+```
+
+# 3. Load metadata and align sample IDs
+
+```{r load-metadata}
+meta_raw <- read.csv(meta_path, stringsAsFactors = FALSE)
+
+# Confirm sample IDs match
+all(colnames(count_matrix) %in% meta_raw$Run)
+
+# Minimal metadata used for DESeq2 design
+meta_min <- data.frame(
+  sample_id = meta_raw$Run,
+  response  = meta_raw$anti.pd.1_response,
+  stringsAsFactors = FALSE
+)
+rownames(meta_min) <- meta_min$sample_id
+
+# Align metadata rows to count matrix columns
+meta_min <- meta_min[colnames(count_matrix), , drop = FALSE]
+stopifnot(all(rownames(meta_min) == colnames(count_matrix)))
+
+# Optional richer metadata (kept for future models / covariate checks)
+meta_qc <- data.frame(
+  sample_id      = meta_raw$Run,
+  response       = meta_raw$anti.pd.1_response,
+  gender         = meta_raw$gender,
+  disease_status = meta_raw$disease_status,
+  vital_status   = meta_raw$vital_status,
+  study_site     = meta_raw$study_site,
+  braf           = meta_raw$braf,
+  nras           = meta_raw$nras,
+  nf1            = meta_raw$nf1,
+  stringsAsFactors = FALSE
+)
+rownames(meta_qc) <- meta_qc$sample_id
+meta_qc <- meta_qc[colnames(count_matrix), , drop = FALSE]
+stopifnot(all(rownames(meta_qc) == colnames(count_matrix)))
+
+# Response distribution
+table(meta_min$response)
+```
+
+# 4. Filter low-expressed genes
+
+```{r gene-filtering}
+# Keep genes expressed at >= min_count in at least min_prop_samples fraction of samples
+keep_gene <- rowSums(count_matrix >= min_count) >= ceiling(min_prop_samples * ncol(count_matrix))
+sum(keep_gene)
+```
+
+# 4. Filter low-expressed genes
+
+```{r filter-genes}
+# Keep genes expressed (>= min_count) in at least min_prop_samples of samples
+min_samples <- ceiling(min_prop_samples * ncol(count_matrix))
+keep_gene <- rowSums(count_matrix >= min_count) >= min_samples
+
+sum(keep_gene)  # number of genes retained
+```
+
+# 5. DESeq2: 3-class response (original labels)
+
+```{r deseq-multiclass}
+# Make response a clean factor with stable levels
+meta_min$response <- factor(
+  meta_min$response,
+  levels = c("Complete Response", "Partial Response", "Progressive Disease"),
+  labels = c("Complete_Response", "Partial_Response", "Progressive_Disease")
+)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = count_matrix[keep_gene, ],
+  colData   = meta_min,
+  design    = ~ response
+)
+
+dds <- DESeq(dds)
+
+# Variance stabilizing transform for PCA / heatmaps
+vsd <- vst(dds, blind = TRUE)
+summary(sizeFactors(dds))
+```
+
+## PCA (VST)
+
+```{r pca-plot}
+vst_mat <- assay(vsd)
+pca <- prcomp(t(vst_mat), scale. = FALSE)
+
+pca_df <- data.frame(
+  sample   = rownames(pca$x),
+  PC1      = pca$x[, 1],
+  PC2      = pca$x[, 2],
+  response = meta_min$response
+)
+
+p <- ggplot(pca_df, aes(PC1, PC2, color = response)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(
+    title = "PCA of VST-normalized RNA-seq",
+    x = "PC1",
+    y = "PC2"
+  )
+
+ggsave(file.path(out_dir, "PCA_PC1_PC2.pdf"), p, width = 6, height = 5)
+```
+
+# 6. DESeq2: binary response (Responder vs Progressive)
+
+```{r make-binary-response}
+# Define responders as Complete + Partial
+meta_min$response_bin <- ifelse(
+  meta_min$response %in% c("Complete_Response", "Partial_Response"),
+  "Responder",
+  "Progressive"
+)
+meta_min$response_bin <- factor(meta_min$response_bin, levels = c("Progressive", "Responder"))
+
+table(meta_min$response_bin)
+```
+
+
+```{r deseq-binary}
+dds_bin <- DESeqDataSetFromMatrix(
+  countData = count_matrix[keep_gene, ],
+  colData   = meta_min,
+  design    = ~ response_bin
+)
+
+dds_bin <- DESeq(dds_bin)
+```
+
+
+# 7. Differential expression results (binary)
+
+```{r deseq-results}
+res <- results(dds_bin, alpha = alpha_fdr)
+summary(res)
+
+res_df <- as.data.frame(res)
+res_df$gene <- rownames(res_df)
+res_df <- res_df[order(res_df$padj), ]
+
+head(res_df, 20)
+```
+
+## LFC shrinkage (for interpretation)
+
+```{r lfc-shrink}
+check_pkg("ashr")
+library(ashr)
+
+res_shrunk <- lfcShrink(
+  dds_bin,
+  coef = "response_bin_Responder_vs_Progressive",
+  type = "ashr"
+)
+
+res_shrunk_df <- as.data.frame(res_shrunk)
+res_shrunk_df$gene <- rownames(res_shrunk_df)
+res_shrunk_df$absLFC <- abs(res_shrunk_df$log2FoldChange)
+res_shrunk_df <- res_shrunk_df[order(res_shrunk_df$padj), ]
+
+head(res_shrunk_df, 10)
+```
+
+## Define a conservative DE gene set
+
+```{r robust-de}
+robust_de <- subset(
+  res_shrunk_df,
+  padj < alpha_fdr & absLFC < 8 & baseMean > 20
+)
+
+nrow(robust_de)
+```
+
+## Add gene symbols (Ensembl -> SYMBOL)
+
+```{r annotate-genes}
+robust_de$ensembl <- gsub("\\..*", "", robust_de$gene)
+
+robust_de$symbol <- mapIds(
+  org.Hs.eg.db,
+  keys = robust_de$ensembl,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+head(robust_de[order(robust_de$padj), c("symbol", "log2FoldChange", "padj")], 20)
+```
+
+```{r export-de}
+# Save tables for downstream use / reporting
+write.csv(res_df,        file.path(out_dir_results, "DESeq2_results_unshrunk.csv"), row.names = FALSE)
+write.csv(res_shrunk_df, file.path(out_dir_results, "DESeq2_results_shrunk.csv"),   row.names = FALSE)
+write.csv(robust_de,     file.path(out_dir_results, "DESeq2_robust_DE_genes.csv"),  row.names = FALSE)
+```
+
+# 8. Hallmark pathway analysis (ssGSEA / GSVA)
+
+This section estimates Hallmark pathway activity per sample using VST-normalized expression mapped to gene symbols.
+
+```{r hallmark-genesets}
+msig <- msigdbr(species = "Homo sapiens", category = "H")
+hallmark <- split(msig$gene_symbol, msig$gs_name)
+length(hallmark)
+```
+
+```{r map-to-symbols}
+# VST matrix from the multi-class DESeq2 object
+vst_mat <- assay(vsd)
+
+# Map Ensembl -> symbol (drop Ensembl version suffix)
+ens <- gsub("\\..*", "", rownames(vst_mat))
+symbols <- mapIds(
+  org.Hs.eg.db,
+  keys = ens,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+# Keep only mapped genes
+keep_sym <- !is.na(symbols)
+vst_sym <- vst_mat[keep_sym, ]
+rownames(vst_sym) <- symbols[keep_sym]
+
+# If multiple Ensembl IDs map to the same symbol, keep the one with highest mean expression
+vst_sym <- vst_sym[order(rowMeans(vst_sym), decreasing = TRUE), ]
+vst_sym <- vst_sym[!duplicated(rownames(vst_sym)), ]
+
+dim(vst_sym)
+```
+
+```{r gsva-run}
+# ssGSEA is robust for per-sample pathway scoring
+param <- ssgseaParam(exprData = vst_sym, geneSets = hallmark)
+gsva_scores <- gsva(param)
+
+dim(gsva_scores)
+```
+
+## Test pathways vs response (limma)
+
+```{r gsva-limma}
+# Ensure metadata aligns with gsva columns
+meta_for_gsva <- meta_min[colnames(gsva_scores), , drop = FALSE]
+stopifnot(all(rownames(meta_for_gsva) == colnames(gsva_scores)))
+
+design <- model.matrix(~ response_bin, data = meta_for_gsva)
+fit <- lmFit(gsva_scores, design)
+fit <- eBayes(fit)
+
+top_paths <- topTable(fit, coef = "response_binResponder", number = 20)
+top_paths
+
+```
+
+## Heatmap of top pathways
+
+```{r gsva-heatmap}
+# Build annotation
+ann <- data.frame(Response = meta_min$response_bin)
+rownames(ann) <- rownames(meta_min)
+top_pathways <- rownames(top_paths)
+
+# align annotation to GSVA matrix
+ann <- ann[colnames(gsva_scores), , drop = FALSE]
+
+# Set factor order
+ann$Response <- factor(
+  ann$Response,
+  levels = c("Responder", "Progressive")
+)
+
+# Order samples by response
+ord <- order(ann$Response)
+
+# Reorder BOTH objects
+gsva_scores <- gsva_scores[, ord]
+ann <- ann[ord, , drop = FALSE]
+
+# Plot
+pdf(file.path(out_dir, "GSVA_hallmark_heatmap.pdf"), width = 15, height = 7)
+
+ann_colors <- list(
+  Response = c(
+    "Responder"   = "#2c7bb6",  # blue
+    "Progressive" = "#d7191c"   # red
+  )
+)
+
+pheatmap(
+  gsva_scores[top_pathways, ],
+  annotation_col = ann,
+  annotation_colors = ann_colors,
+  scale = "row",
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  show_colnames = FALSE,
+  main = "Hallmark pathway activity vs response",
+  legend = TRUE,
+  annotation_legend = TRUE
+)
+
+dev.off()
+
+
+```
+
+# 9. Targeted gene panels (boxplots + Wilcoxon)
+
+```{r gene-panel-data}
+
+library(dplyr)
+library(tidyr)
+
+# Ensure metadata is aligned to vst_sym columns
+meta_plot <- meta_min[colnames(vst_sym), , drop = FALSE]
+stopifnot(all(rownames(meta_plot) == colnames(vst_sym)))
+
+# Keep only genes present
+genes_to_plot <- c(
+  "AXL","ROR2","WNT5A","TAGLN",
+  "LOXL2","TWIST2","CDH1","FAP",
+  "CCL2","CCL7","CCL8","CCL13",
+  "IL10","VEGFC","VEGFA"
+)
+
+genes_present <- intersect(genes_to_plot, rownames(vst_sym))
+
+plot_df <- as.data.frame(t(vst_sym[genes_present, , drop = FALSE]))
+plot_df$sample <- rownames(plot_df)
+plot_df$response <- meta_plot$response_bin
+
+plot_long <- plot_df %>%
+  pivot_longer(cols = all_of(genes_present), names_to = "gene", values_to = "expr")
+
+library(rstatix)
+
+pvals <- plot_long %>%
+  group_by(gene) %>%
+  wilcox_test(expr ~ response) %>%
+  mutate(p_label = paste0("p=", signif(p, 2))) %>%
+  select(gene, p_label)
+
+library(ggplot2)
+
+plot_long <- plot_long %>%
+  mutate(response = factor(response, levels = c("Progressive", "Responder"),
+                           labels = c("Non-responding", "Responding")))
+
+pdf(file.path(out_dir, "gene_panels_boxplot.pdf"), width = 15, height = 7)
+
+ggplot(plot_long, aes(x = response, y = expr)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, size = 1, alpha = 0.7) +
+  facet_wrap(~ gene, scales = "free_y", ncol = 4) +
+  theme_bw() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "italic"),
+    axis.title.x = element_blank()
+  ) +
+  labs(y = "VST expression") +
+  geom_text(
+    data = pvals,
+    aes(x = 1.5, y = Inf, label = p_label),
+    inherit.aes = FALSE,
+    vjust = 1.2,
+    size = 3
+  )
+
+dev.off()
+```
+
+# 10. Heatmap of selected DE genes
+
+```{r deg-heatmap}
+# Choose genes to show in a heatmap
+
+# a curated set (edit freely)
+deg_symbols <- c("AXL","ROR2","LOXL2","VEGFC","FLT1","ANGPT2","IL10","CDH1")
+
+# Order samples: Non-responding first
+grp <- factor(
+  meta_min$response_bin,
+  levels = c("Progressive", "Responder"),
+  labels = c("Non-responding", "Responding")
+)
+
+sample_order <- order(grp)
+samples <- rownames(meta_min)[sample_order]
+
+# Expression from symbol-mapped VST matrix
+deg_symbols <- intersect(deg_symbols, rownames(vst_sym))
+mat <- vst_sym[deg_symbols, samples, drop = FALSE]
+
+# Row z-score
+mat_z <- t(scale(t(mat)))
+mat_z[is.na(mat_z)] <- 0
+
+# Column annotation
+top_ha <- HeatmapAnnotation(
+  Response = grp[sample_order],
+  show_annotation_name = FALSE
+)
+
+pdf(file.path(out_dir, "DEG_heatmap.pdf"), width = 15, height = 7)
+ht <- Heatmap(
+  mat_z,
+  name = "Row Z-score",
+  top_annotation = top_ha,
+  cluster_rows = TRUE,
+  cluster_columns = FALSE,
+  column_split = grp[sample_order],
+  show_column_names = FALSE,
+  row_names_side = "right",
+  row_names_gp = grid::gpar(fontface = "italic")
+)
+draw(ht)
+dev.off()
+
+```
+
+# 11. CIBERSORTx input preparation
+
+```{r cibersortx-input}
+# Prepare a gene-symbol expression matrix (normalized counts) for CIBERSORTx
+norm_counts <- counts(dds_bin, normalized = TRUE)
+ens <- gsub("\\..*", "", rownames(norm_counts))
+
+symbols_nc <- mapIds(
+  org.Hs.eg.db,
+  keys = ens,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+keep_nc <- !is.na(symbols_nc)
+expr <- norm_counts[keep_nc, ]
+rownames(expr) <- symbols_nc[keep_nc]
+
+expr <- expr[order(rowMeans(expr), decreasing = TRUE), ]
+expr <- expr[!duplicated(rownames(expr)), ]
+
+ciber_mat <- data.frame(GeneSymbol = rownames(expr), expr, check.names = FALSE)
+
+write.table(
+  ciber_mat,
+  file = file.path("/rds/projects/e/elhamsak-group5/main_project/processed_data/rna_seq/cibersortx", "CIBERSORTx_input.txt"),
+  sep = "\t",
+  row.names = FALSE,
+  quote = FALSE
+)
+
+dim(ciber_mat)
+sum(duplicated(ciber_mat$GeneSymbol))
+```
+
+# 12. CIBERSORTx results: group differences + heatmap
+
+```{r cibersortx-load}
+# Load CIBERSORTx results exported as CSV
+ciber <- read.csv(ciber_path, row.names = 1, check.names = FALSE)
+
+# Drop summary columns if present
+cell_cols <- setdiff(colnames(ciber), c("P.value", "Correlation", "RMSE"))
+frac <- ciber[, cell_cols, drop = FALSE]
+
+# Add response group
+frac$response <- meta_min[rownames(frac), "response_bin"]
+table(frac$response, useNA = "ifany")
+
+summary(frac)
+```
+
+```{r cibersortx-stats}
+cell_types <- setdiff(colnames(frac), "response")
+
+pvals_cells <- sapply(cell_types, function(ct) {
+  wilcox.test(
+    frac[frac$response == "Progressive", ct],
+    frac[frac$response == "Responder", ct],
+    exact = FALSE
+  )$p.value
+})
+
+ciber_stats <- data.frame(
+  Cell = cell_types,
+  p = pvals_cells,
+  padj = p.adjust(pvals_cells, "BH")
+)
+
+head(ciber_stats[order(ciber_stats$p), ], 10)
+write.csv(ciber_stats, file.path(out_dir_results, "CIBERSORTx_celltype_stats.csv"), row.names = FALSE)
+```
+
+```{r cibersortx-boxplots}
+# Plot the top few cell types by p-value
+ntop <- 6
+top_cells <- ciber_stats$Cell[order(ciber_stats$p)][seq_len(min(ntop, nrow(ciber_stats)))]
+
+pdf(file.path(out_dir, "CIBERSORT_top_cells_boxplots.pdf"), width = 10, height = 6)
+par(mfrow = c(2, 3))
+for (ct in top_cells) {
+  boxplot(frac[[ct]] ~ frac$response, main = ct, ylab = "Fraction")
+}
+dev.off()
+```
+
+# 13. Immune-pathway correlations (Spearman)
+
+```{r immune-pathway-correlation}
+immune_cells <- c(
+  "Eosinophils",
+  "T cells regulatory (Tregs)",
+  "Macrophages M2",
+  "NK cells activated"
+)
+immune_cells <- immune_cells[immune_cells %in% colnames(frac)]
+
+pathways <- c(
+  "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  "HALLMARK_TGF_BETA_SIGNALING",
+  "HALLMARK_ANGIOGENESIS"
+)
+pathways <- pathways[pathways %in% rownames(gsva_scores)]
+
+gsva_sub <- t(gsva_scores[pathways, rownames(frac), drop = FALSE])
+
+cor_results <- expand.grid(
+  Immune = immune_cells,
+  Pathway = pathways,
+  stringsAsFactors = FALSE
+)
+cor_results$rho <- NA_real_
+cor_results$p <- NA_real_
+
+for (i in seq_len(nrow(cor_results))) {
+  ic <- cor_results$Immune[i]
+  pw <- cor_results$Pathway[i]
+
+  ct <- cor.test(frac[[ic]], gsva_sub[, pw], method = "spearman")
+  cor_results$rho[i] <- unname(ct$estimate)
+  cor_results$p[i] <- ct$p.value
+}
+
+cor_results$padj <- p.adjust(cor_results$p, method = "BH")
+cor_results <- cor_results[order(cor_results$padj, cor_results$p), ]
+
+cor_results
+write.csv(cor_results, file.path(out_dir_results, "Immune_pathway_spearman_correlations.csv"), row.names = FALSE)
+```
+```{r}
+# ============================================================
+# Immune–Pathway correlations (CIBERSORT fractions vs GSVA)
+# Purpose:
+#   1) Extract GSVA scores for exclusion-related hallmark pathways
+#   2) Spearman correlations across immune cells × pathways
+#   3) Focused plots: Tregs vs each pathway program
+#   4) Compute IPRES-like score as mean GSVA across selected pathways
+# ============================================================
+
+# Define pathways of interest
+
+exclusion_pathways <- c(
+  "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  "HALLMARK_TGF_BETA_SIGNALING",
+  "HALLMARK_ANGIOGENESIS"
+)
+
+# Keep only pathways that exist in gsva_scores (prevents subscript errors)
+exclusion_pathways <- exclusion_pathways[exclusion_pathways %in% rownames(gsva_scores)]
+stopifnot(length(exclusion_pathways) > 0)
+
+# ---------------------------
+# 1) Subset GSVA to cohort in 'frac' and transpose to samples × pathways
+# Assumptions:
+#   - gsva_scores: pathways × samples matrix
+#   - frac: samples × immune_cells data.frame/matrix
+#   - sample IDs match: rownames(frac) == colnames(gsva_scores)
+# ---------------------------
+
+stopifnot(all(rownames(frac) %in% colnames(gsva_scores)))
+
+gsva_sub <- t(gsva_scores[exclusion_pathways, rownames(frac), drop = FALSE])
+# gsva_sub: samples × pathways
+stopifnot(all(rownames(gsva_sub) == rownames(frac)))
+
+# ---------------------------
+# 2) Spearman correlations: immune cell fractions vs pathway scores
+# ---------------------------
+
+cor_results <- expand.grid(
+  Immune = immune_cells,
+  Pathway = exclusion_pathways,
+  stringsAsFactors = FALSE
+)
+
+cor_results <- cor_results |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    test = list(
+      cor.test(
+        x = frac[[Immune]],
+        y = gsva_sub[, Pathway],
+        method = "spearman",
+        exact = FALSE
+      )
+    ),
+    rho = unname(test$estimate),
+    p = test$p.value
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(padj = p.adjust(p, method = "BH")) |>
+  dplyr::select(-test)
+
+cor_results
+
+# ---------------------------
+# 3) Focused plots: Tregs vs exclusion programs
+# ---------------------------
+
+treg_col <- "T cells regulatory (Tregs)"
+stopifnot(treg_col %in% colnames(frac))
+
+treg <- frac[[treg_col]]
+
+plot_panels <- c(
+  EMT = "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  `TGF-β` = "HALLMARK_TGF_BETA_SIGNALING",
+  Angiogenesis = "HALLMARK_ANGIOGENESIS"
+)
+plot_panels <- plot_panels[plot_panels %in% colnames(gsva_sub)]  # only present
+
+pdf(file.path(out_dir, "Tregs_vs_ExclusionPrograms.pdf"), width = 15, height = 4)
+par(mfrow = c(1, length(plot_panels)), mar = c(4, 4, 3, 1))
+
+for (label in names(plot_panels)) {
+  pw <- plot_panels[[label]]
+  x <- gsva_sub[, pw]
+
+  ct <- cor.test(treg, x, method = "spearman", exact = FALSE)
+
+  plot(
+    x, treg,
+    pch = 16,
+    xlab = paste0(label, " GSVA score"),
+    ylab = "Treg fraction (CIBERSORTx)",
+    main = paste0("Tregs vs ", label)
+  )
+
+  # Visual trend line (note: Spearman test, but LM line is fine as a visual aid)
+  abline(lm(treg ~ x), lwd = 2)
+
+  # Annotate stats
+  mtext(
+    paste0(
+      "rho = ", round(unname(ct$estimate), 2),
+      " | p = ", format.pval(ct$p.value, digits = 2)
+    ),
+    side = 3, line = -1.2, adj = 0, cex = 0.85
+  )
+}
+
+dev.off()
+
+# ---------------------------
+# 4) IPRES-like score: mean GSVA across selected pathways
+# ---------------------------
+
+ipres_pathways <- c(
+  "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  "HALLMARK_TGF_BETA_SIGNALING",
+  "HALLMARK_ANGIOGENESIS",
+  "HALLMARK_HYPOXIA",
+  "HALLMARK_WOUND_HEALING",
+  "HALLMARK_GLYCOLYSIS",
+  "HALLMARK_WNT_BETA_CATENIN_SIGNALING",
+  "HALLMARK_IL6_JAK_STAT3_SIGNALING",
+  "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
+)
+
+ipres_pathways <- ipres_pathways[ipres_pathways %in% rownames(gsva_scores)]
+stopifnot(length(ipres_pathways) > 0)
+
+# IPRES score per sample (samples are columns in gsva_scores)
+ipres_score <- colMeans(gsva_scores[ipres_pathways, , drop = FALSE], na.rm = TRUE)
+
+summary(ipres_score)
+
+ipres_status <- ifelse(
+  ipres_score >= median(ipres_score, na.rm = TRUE),
+  "Enriched",
+  "Not enriched"
+)
+
+ipres_status <- factor(ipres_status, levels = c("Enriched", "Not enriched"))
+table(ipres_status)
+
+```
+
+# 14. Survival analysis: IPRES signature
+
+This section requires an `os` data.frame with:
+- `time_years` (numeric)
+- `status` (0/1; 1 = event)
+- `ipres_status` (factor with two levels, e.g. "Enriched" / "Not enriched")
+
+```{r ipres-km, eval=FALSE}
+
+os <- read.csv("/rds/projects/e/elhamsak-group5/main_project/data/meta_data/os_survival.csv", stringsAsFactors = FALSE)
+
+# time in years (to match the paper figure)
+os$time_years <- os$os_time / 365.25
+
+# event: 1 = death, 0 = censored
+os$event <- ifelse(os$status == "Dead", 1, 0)
+
+# attach IPRES
+os$IPRES <- ipres_status[os$SRA_ID]
+
+table(os$IPRES, useNA = "ifany")
+
+library(survival)
+
+surv_obj <- Surv(os$time_years, os$event)
+fit <- survfit(surv_obj ~ IPRES, data = os)
+
+# log-rank test
+lr <- survdiff(surv_obj ~ IPRES, data = os)
+pval <- 1 - pchisq(lr$chisq, df = 1)
+
+pdf(file.path(out_dir, "IPRES_KM.pdf"), width = 8, height = 6)
+
+plot(
+  fit,
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  mark.time = TRUE,
+  xlab = "Survival (years)",
+  ylab = "Fraction surviving",
+  main = "IPRES signature",
+  xaxs = "i",
+  yaxs = "i"
+)
+
+legend(
+  "topright",
+  legend = c("Enriched", "Not enriched"),
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  bty = "n"
+)
+
+text(
+  x = max(os$time_years, na.rm = TRUE) * 0.7,
+  y = 0.25,
+  labels = paste0("p=", format.pval(pval, digits = 2))
+)
+
+dev.off()
+
+```
+
+# 15. Session information
+
+```{r session-info}
+sessionInfo()
+```
+
+```{r}
+# Convert to IPRES into data frame (optional)
+# ipres_df <- data.frame(Sample = names(ipres_score), IPRES  = ipres_score)
+
+# Write to CSV
+# write.csv(ipres_df, file = "IPRES_scores.csv", row.names = FALSE)
+```
+
+```{r}
+# Normalized counts download (optional)
+# norm_counts <- counts(dds, normalized = TRUE)
+
+# Save to CSV
+# write.csv(norm_counts, file = "normalized_counts_DESeq2.csv")
+
+```
+

@@ -1,0 +1,5 @@
+"0","res_shrunk_df <- as.data.frame(res_shrunk)"
+"0","res_shrunk_df$gene <- rownames(res_shrunk_df)"
+"0","res_shrunk_df <- res_shrunk_df[order(res_shrunk_df$padj), ]"
+"0",""
+"0","head(res_shrunk_df, 10)"

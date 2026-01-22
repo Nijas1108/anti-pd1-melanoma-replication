@@ -1,0 +1,121 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShkcGx5cilcblxuIyAxLiBDYWxjdWxhdGUgU05QLW9ubHkgY291bnRzIChuc1NOVilcbnNucF9jb3VudHMgPC0gbWFmX2RmICU+JVxuICBmaWx0ZXIoVmFyaWFudF9UeXBlID09IFwiU05QXCIsIFxuICAgICAgICAgVmFyaWFudF9DbGFzc2lmaWNhdGlvbiAlaW4lIG5zX2NsYXNzZXMpICU+JVxuICBjb3VudChUdW1vcl9TYW1wbGVfQmFyY29kZSwgbmFtZSA9IFwibnNTTlZfU05QXCIpXG5cbiMgMi4gQ2FsY3VsYXRlIEFsbCBOb24tc2lsZW50IGNvdW50cyAoSW5jbHVkZXMgSW5kZWxzKVxuYWxsX25vbnNpbGVudF9jb3VudHMgPC0gbWFmX2RmICU+JVxuICBmaWx0ZXIoVmFyaWFudF9DbGFzc2lmaWNhdGlvbiAlaW4lIG5vbnNpbGVudF9jbGFzc2VzKSAlPiVcbiAgY291bnQoVHVtb3JfU2FtcGxlX0JhcmNvZGUsIG5hbWUgPSBcIm5zU05WX2FsbFwiKVxuIyBcbiMgIyAzLiBDb21iaW5lIGV2ZXJ5dGhpbmcgd2l0aCBQYXRpZW50LklEXG4jIG5zU05WX2J5X3NhbXBsZSA8LSBzbnBfY291bnRzICU+JVxuIyAgIGxlZnRfam9pbihhbGxfbm9uc2lsZW50X2NvdW50cywgYnkgPSBcIlR1bW9yX1NhbXBsZV9CYXJjb2RlXCIpICU+JVxuIyAgIGxlZnRfam9pbihjbGluX2RmICU+JSBzZWxlY3QoVHVtb3JfU2FtcGxlX0JhcmNvZGUsIFBhdGllbnQuSUQpLCBieSA9IFwiVHVtb3JfU2FtcGxlX0JhcmNvZGVcIikgJT4lXG4jICAgc2VsZWN0KFBhdGllbnQuSUQsIFR1bW9yX1NhbXBsZV9CYXJjb2RlLCBuc1NOVl9TTlAsIG5zU05WX2FsbCkgJT4lXG4jICAgYXJyYW5nZShkZXNjKG5zU05WX1NOUCkpXG4jIFxuIyAjIFZpZXcgcmVzdWx0c1xuIyBoZWFkKG5zU05WX2J5X3NhbXBsZSwgMjApXG4jIFxuIyBsaWJyYXJ5KGRwbHlyKVxuXG4jIDEuIExvYWQgdGhlIGF1dGhvcidzIGRhdGFcbiMgKEFzc3VtaW5nIHRoZSBmaWxlIGlzIGluIHlvdXIgd29ya2luZyBkaXJlY3RvcnkpXG5hdXRob3JfZGF0YSA8LSByZWFkLmNzdihcIi4uL1Nudl9jb3VudHMuY3N2XCIsIHN0cmluZ3NBc0ZhY3RvcnMgPSBGQUxTRSlcblxuIyBOb3RlOiBJZiByZWFkLmNzdiBkaWRuJ3QgY2hhbmdlIHRoZSBuYW1lIGF1dG9tYXRpY2FsbHksIFxuIyB3ZSBjYW4gcmVuYW1lIGl0IG1hbnVhbGx5IHRvIGVuc3VyZSB0aGUgam9pbiB3b3JrczpcbmlmKFwiUGF0aWVudC5JRFwiICVpbiUgY29sbmFtZXMoYXV0aG9yX2RhdGEpID09IEZBTFNFICYgXCJQYXRpZW50LklEXCIgJWluJSBjb2xuYW1lcyhhdXRob3JfZGF0YSkgPT0gRkFMU0Upe1xuICAgIyBUaGlzIGhhbmRsZXMgY2FzZXMgd2hlcmUgdGhlIGNvbHVtbiBtaWdodCBiZSAnUGF0aWVudC5JRCcgb3IgJ1BhdGllbnQuSUQnXG4gICBhdXRob3JfZGF0YSA8LSBhdXRob3JfZGF0YSAlPiUgcmVuYW1lKFBhdGllbnQuSUQgPSBQYXRpZW50LklEKSBcbn1cblxuIyAyLiBVcGRhdGUgeW91ciBleGlzdGluZyBuc1NOVl9ieV9zYW1wbGUgdGFibGVcbm5zU05WX2J5X3NhbXBsZSA8LSBzbnBfY291bnRzICU+JVxuICAjIEpvaW4geW91ciBjYWxjdWxhdGVkIFNOUCBjb3VudHNcbiAgbGVmdF9qb2luKGFsbF9ub25zaWxlbnRfY291bnRzLCBieSA9IFwiVHVtb3JfU2FtcGxlX0JhcmNvZGVcIikgJT4lXG4gICMgSm9pbiB5b3VyIGNsaW5pY2FsIG1hcHBpbmcgdG8gZ2V0IFBhdGllbnQuSURcbiAgbGVmdF9qb2luKGNsaW5fZGYgJT4lIHNlbGVjdChUdW1vcl9TYW1wbGVfQmFyY29kZSwgUGF0aWVudC5JRCksIGJ5ID0gXCJUdW1vcl9TYW1wbGVfQmFyY29kZVwiKSAlPiVcbiAgIyBKb2luIHRoZSBhdXRob3IncyBvcmlnaW5hbCB2YWx1ZXMgZnJvbSB0aGUgQ1NWXG4gIGxlZnRfam9pbihhdXRob3JfZGF0YSAlPiUgc2VsZWN0KFBhdGllbnQuSUQsIFRvdGFsTm9uU3luLCBUb3RhbE5vblN5bl9FeHApLCBieSA9IFwiUGF0aWVudC5JRFwiKSAlPiVcbiAgIyBPcmdhbml6ZSBhbmQgc29ydFxuICBzZWxlY3QoUGF0aWVudC5JRCwgVHVtb3JfU2FtcGxlX0JhcmNvZGUsIG5zU05WX1NOUCwgbnNTTlZfYWxsLCBhdXRoX1RvdGFsTm9uU3luPVRvdGFsTm9uU3luLCBhdXRoX1RvdGFsTm9uU3luX0V4cD1Ub3RhbE5vblN5bl9FeHApICU+JVxuICBhcnJhbmdlKGRlc2MobnNTTlZfU05QKSlcblxuIyBWaWV3IHRoZSBjb21wYXJpc29uXG5oZWFkKG5zU05WX2J5X3NhbXBsZSwgMjApXG5gYGAifQ== -->
+
+```r
+library(dplyr)
+
+# 1. Calculate SNP-only counts (nsSNV)
+snp_counts <- maf_df %>%
+  filter(Variant_Type == \"SNP\", 
+         Variant_Classification %in% ns_classes) %>%
+  count(Tumor_Sample_Barcode, name = \"nsSNV_SNP\")
+
+# 2. Calculate All Non-silent counts (Includes Indels)
+all_nonsilent_counts <- maf_df %>%
+  filter(Variant_Classification %in% nonsilent_classes) %>%
+  count(Tumor_Sample_Barcode, name = \"nsSNV_all\")
+# 
+# # 3. Combine everything with Patient.ID
+# nsSNV_by_sample <- snp_counts %>%
+#   left_join(all_nonsilent_counts, by = \"Tumor_Sample_Barcode\") %>%
+#   left_join(clin_df %>% select(Tumor_Sample_Barcode, Patient.ID), by = \"Tumor_Sample_Barcode\") %>%
+#   select(Patient.ID, Tumor_Sample_Barcode, nsSNV_SNP, nsSNV_all) %>%
+#   arrange(desc(nsSNV_SNP))
+# 
+# # View results
+# head(nsSNV_by_sample, 20)
+# 
+# library(dplyr)
+
+# 1. Load the author's data
+# (Assuming the file is in your working directory)
+author_data <- read.csv(\"../Snv_counts.csv\", stringsAsFactors = FALSE)
+
+# Note: If read.csv didn't change the name automatically, 
+# we can rename it manually to ensure the join works:
+if(\"Patient.ID\" %in% colnames(author_data) == FALSE & \"Patient.ID\" %in% colnames(author_data) == FALSE){
+   # This handles cases where the column might be 'Patient.ID' or 'Patient.ID'
+   author_data <- author_data %>% rename(Patient.ID = Patient.ID) 
+}
+
+# 2. Update your existing nsSNV_by_sample table
+nsSNV_by_sample <- snp_counts %>%
+  # Join your calculated SNP counts
+  left_join(all_nonsilent_counts, by = \"Tumor_Sample_Barcode\") %>%
+  # Join your clinical mapping to get Patient.ID
+  left_join(clin_df %>% select(Tumor_Sample_Barcode, Patient.ID), by = \"Tumor_Sample_Barcode\") %>%
+  # Join the author's original values from the CSV
+  left_join(author_data %>% select(Patient.ID, TotalNonSyn, TotalNonSyn_Exp), by = \"Patient.ID\") %>%
+  # Organize and sort
+  select(Patient.ID, Tumor_Sample_Barcode, nsSNV_SNP, nsSNV_all, auth_TotalNonSyn=TotalNonSyn, auth_TotalNonSyn_Exp=TotalNonSyn_Exp) %>%
+  arrange(desc(nsSNV_SNP))
+
+# View the comparison
+head(nsSNV_by_sample, 20)
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+library(dplyr)
+
+# 1. Calculate SNP-only counts (nsSNV)
+snp_counts <- maf_df %>%
+  filter(Variant_Type == \"SNP\", 
+         Variant_Classification %in% ns_classes) %>%
+  count(Tumor_Sample_Barcode, name = \"nsSNV_SNP\")
+
+# 2. Calculate All Non-silent counts (Includes Indels)
+all_nonsilent_counts <- maf_df %>%
+  filter(Variant_Classification %in% nonsilent_classes) %>%
+  count(Tumor_Sample_Barcode, name = \"nsSNV_all\")
+# 
+# # 3. Combine everything with Patient.ID
+# nsSNV_by_sample <- snp_counts %>%
+#   left_join(all_nonsilent_counts, by = \"Tumor_Sample_Barcode\") %>%
+#   left_join(clin_df %>% select(Tumor_Sample_Barcode, Patient.ID), by = \"Tumor_Sample_Barcode\") %>%
+#   select(Patient.ID, Tumor_Sample_Barcode, nsSNV_SNP, nsSNV_all) %>%
+#   arrange(desc(nsSNV_SNP))
+# 
+# # View results
+# head(nsSNV_by_sample, 20)
+# 
+# library(dplyr)
+
+# 1. Load the author's data
+# (Assuming the file is in your working directory)
+author_data <- read.csv(\"../Snv_counts.csv\", stringsAsFactors = FALSE)
+
+# Note: If read.csv didn't change the name automatically, 
+# we can rename it manually to ensure the join works:
+if(\"Patient.ID\" %in% colnames(author_data) == FALSE & \"Patient.ID\" %in% colnames(author_data) == FALSE){
+   # This handles cases where the column might be 'Patient.ID' or 'Patient.ID'
+   author_data <- author_data %>% rename(Patient.ID = Patient.ID) 
+}
+
+# 2. Update your existing nsSNV_by_sample table
+nsSNV_by_sample <- snp_counts %>%
+  # Join your calculated SNP counts
+  left_join(all_nonsilent_counts, by = \"Tumor_Sample_Barcode\") %>%
+  # Join your clinical mapping to get Patient.ID
+  left_join(clin_df %>% select(Tumor_Sample_Barcode, Patient.ID), by = \"Tumor_Sample_Barcode\") %>%
+  # Join the author's original values from the CSV
+  left_join(author_data %>% select(Patient.ID, TotalNonSyn, TotalNonSyn_Exp), by = \"Patient.ID\") %>%
+  # Organize and sort
+  select(Patient.ID, Tumor_Sample_Barcode, nsSNV_SNP, nsSNV_all, auth_TotalNonSyn=TotalNonSyn, auth_TotalNonSyn_Exp=TotalNonSyn_Exp) %>%
+  arrange(desc(nsSNV_SNP))
+
+# View the comparison
+head(nsSNV_by_sample, 20)
+```"
+"1","
+<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbImRhdGEuZnJhbWUiXSwibnJvdyI6MjAsIm5jb2wiOjYsInN1bW1hcnkiOnsiRGVzY3JpcHRpb24iOlsiZGYgWzIwIMOXIDZdIl19fSwicmRmIjoiVWtSWU13cFlDZ0FBQUFNQUJBVUFBQU1GQUFBQUFBVlZWRVl0T0FBQUJBSUFBQUFCQUFRQUNRQUFBQUY0QUFBREV3QUFBQVlBQUFBUUFBQUFGQUFFQUFrQUFBQURVSFE0QUFRQUNRQUFBQU5RZERRQUJBQUpBQUFBQkZCME1qY0FCQUFKQUFBQUJGQjBNamNBQkFBSkFBQUFBMUIwTVFBRUFBa0FBQUFEVUhReUFBUUFDUUFBQUFSUWRERTBBQVFBQ1FBQUFBTlFkRGNBQkFBSkFBQUFCRkIwTWpZQUJBQUpBQUFBQTFCME13QUVBQWtBQUFBRVVIUXhOd0FFQUFrQUFBQUVVSFF5T0FBRUFBa0FBQUFFVUhRek13QUVBQWtBQUFBRVVIUXhPUUFFQUFrQUFBQUVVSFF6TVFBRUFBa0FBQUFFVUhRek1BQUVBQWtBQUFBRVVIUXhOUUFFQUFrQUFBQUVVSFF4TmdBRUFBa0FBQUFFVUhReU1BQUVBQWtBQUFBRFVIUTVBQUFBRUFBQUFCUUFCQUFKQUFBQUNsTlNValF5T0RrM01UVUFCQUFKQUFBQUNsTlNVak13T0RNNE16Y0FCQUFKQUFBQUNsTlNValF5T0RrM01qWUFCQUFKQUFBQUNsTlNValF5T0RrM01qVUFCQUFKQUFBQUNsTlNVak13T0RNNE5qWUFCQUFKQUFBQUNsTlNVak13T0RNNE16a0FCQUFKQUFBQUNsTlNVak13T0RNNE5qZ0FCQUFKQUFBQUNsTlNVak13T0RNNE56QUFCQUFKQUFBQUNsTlNVak13T0RNNE5ETUFCQUFKQUFBQUNsTlNVak13T0RNNE5ERUFCQUFKQUFBQUNsTlNValF5T0RrM01qTUFCQUFKQUFBQUNsTlNVak13T0RNNE5URUFCQUFKQUFBQUNsTlNValF5T0RrM016UUFCQUFKQUFBQUNsTlNVak13T0RNNE5EY0FCQUFKQUFBQUNsTlNValF5T0RrM016QUFCQUFKQUFBQUNsTlNValF5T0RrM01qZ0FCQUFKQUFBQUNsTlNVak13T0RNNE5EVUFCQUFKQUFBQUNsTlNValF5T0RrM01qRUFCQUFKQUFBQUNsTlNVak13T0RNNE56SUFCQUFKQUFBQUNsTlNVak13T0RNNE5Ea0FBQUFOQUFBQUZBQUFSU1lBQUF4UkFBQUpDZ0FBQ1FRQUFBZVRBQUFHb3dBQUJTc0FBQVJNQUFBRU5BQUFCQklBQUFMb0FBQUNwZ0FBQWtNQUFBSXlBQUFDRVFBQUFlNEFBQUhwQUFBQjBRQUFBY01BQUFHdEFBQUFEUUFBQUJRQUFFVmdBQUFNdndBQUNZWUFBQW1BQUFBSUFnQUFCdm9BQUFWd0FBQUVlZ0FBQkZrQUFBUkZBQUFER1FBQUF4QUFBQUtNQUFBQ1NBQUFBa0lBQUFJQUFBQUNGUUFBQWU4QUFBSHFBQUFCeUFBQUFBMEFBQUFVQUFBREp3QUFENUVBQUFqNUFBQUkrUUFBQm0wQUFBZVhBQUFGdVFBQUJNRUFBQVJrQUFBRWVnQUFBMUVBQUFIakFBQUNuQUFBQW84QUFBSnRBQUFDTlFBQUFnc0FBQUlPQUFBQ1FRQUFBZThBQUFBTkFBQUFGQUFBQXFFQUFBMXVBQUFFN0FBQUJPd0FBQVZ5QUFBR293QUFCT3dBQUFRdUFBQUQwUUFBQUFBQUFBTGRBQUFCbFFBQUFVOEFBQUl5QUFBQlh3QUFBVGNBQUFITEFBQUJIZ0FBQWRzQUFBRzBBQUFFQWdBQUFBRUFCQUFKQUFBQUJXNWhiV1Z6QUFBQUVBQUFBQVlBQkFBSkFBQUFDbEJoZEdsbGJuUXVTVVFBQkFBSkFBQUFGRlIxYlc5eVgxTmhiWEJzWlY5Q1lYSmpiMlJsQUFRQUNRQUFBQWx1YzFOT1ZsOVRUbEFBQkFBSkFBQUFDVzV6VTA1V1gyRnNiQUFFQUFrQUFBQVFZWFYwYUY5VWIzUmhiRTV2YmxONWJnQUVBQWtBQUFBVVlYVjBhRjlVYjNSaGJFNXZibE41Ymw5RmVIQUFBQVFDQUFBQUFRQUVBQWtBQUFBSmNtOTNMbTVoYldWekFBQUFEUUFBQUFLQUFBQUFBQUFBRkFBQUJBSUFBQUFCQUFRQUNRQUFBQVZqYkdGemN3QUFBQkFBQUFBQkFBUUFDUUFBQUFwa1lYUmhMbVp5WVcxbEFBQUEvZ0FBQkFJQUFBQUJBQVFBQ1FBQUFBZHZjSFJwYjI1ekFBQUNFd0FBQUFZQUFBQVFBQUFBQVFBRUFBa0FBQUFCY2dBQUFCQUFBQUFCQUFRQUNRQUFBQTkxYm01aGJXVmtMV05vZFc1ckxUWUFBQUFRQUFBQUFRQUVBQWtBQUFBRGNHNW5BQUFBQ2dBQUFBRUFBQUFCQUFBQURRQUFBQUVBQUFBVUFBQUFEUUFBQUFFQUFBQUdBQUFFQWdBQUF2OEFBQUFRQUFBQUJnQUVBQWtBQUFBR1pXNW5hVzVsQUFRQUNRQUFBQVZzWVdKbGJBQUVBQWtBQUFBRFpHVjJBQVFBQ1FBQUFBNXliM2R1WVcxbGN5NXdjbWx1ZEFBRUFBa0FBQUFLY205M2N5NTBiM1JoYkFBRUFBa0FBQUFLWTI5c2N5NTBiM1JoYkFBQUFQNEFBQUQrIn0= -->
+
+<div data-pagedtable=\"false\">
+  <script data-pagedtable-source type=\"application/json\">
+{\"columns\":[{\"label\":[\"\"],\"name\":[\"_rn_\"],\"type\":[\"\"],\"align\":[\"left\"]},{\"label\":[\"Patient.ID\"],\"name\":[1],\"type\":[\"chr\"],\"align\":[\"left\"]},{\"label\":[\"Tumor_Sample_Barcode\"],\"name\":[2],\"type\":[\"chr\"],\"align\":[\"left\"]},{\"label\":[\"nsSNV_SNP\"],\"name\":[3],\"type\":[\"int\"],\"align\":[\"right\"]},{\"label\":[\"nsSNV_all\"],\"name\":[4],\"type\":[\"int\"],\"align\":[\"right\"]},{\"label\":[\"auth_TotalNonSyn\"],\"name\":[5],\"type\":[\"int\"],\"align\":[\"right\"]},{\"label\":[\"auth_TotalNonSyn_Exp\"],\"name\":[6],\"type\":[\"int\"],\"align\":[\"right\"]}],\"data\":[{\"1\":\"Pt8\",\"2\":\"SRR4289715\",\"3\":\"17702\",\"4\":\"17760\",\"5\":\"807\",\"6\":\"673\",\"_rn_\":\"1\"},{\"1\":\"Pt4\",\"2\":\"SRR3083837\",\"3\":\"3153\",\"4\":\"3263\",\"5\":\"3985\",\"6\":\"3438\",\"_rn_\":\"2\"},{\"1\":\"Pt27\",\"2\":\"SRR4289726\",\"3\":\"2314\",\"4\":\"2438\",\"5\":\"2297\",\"6\":\"1260\",\"_rn_\":\"3\"},{\"1\":\"Pt27\",\"2\":\"SRR4289725\",\"3\":\"2308\",\"4\":\"2432\",\"5\":\"2297\",\"6\":\"1260\",\"_rn_\":\"4\"},{\"1\":\"Pt1\",\"2\":\"SRR3083866\",\"3\":\"1939\",\"4\":\"2050\",\"5\":\"1645\",\"6\":\"1394\",\"_rn_\":\"5\"},{\"1\":\"Pt2\",\"2\":\"SRR3083839\",\"3\":\"1699\",\"4\":\"1786\",\"5\":\"1943\",\"6\":\"1699\",\"_rn_\":\"6\"},{\"1\":\"Pt14\",\"2\":\"SRR3083868\",\"3\":\"1323\",\"4\":\"1392\",\"5\":\"1465\",\"6\":\"1260\",\"_rn_\":\"7\"},{\"1\":\"Pt7\",\"2\":\"SRR3083870\",\"3\":\"1100\",\"4\":\"1146\",\"5\":\"1217\",\"6\":\"1070\",\"_rn_\":\"8\"},{\"1\":\"Pt26\",\"2\":\"SRR3083843\",\"3\":\"1076\",\"4\":\"1113\",\"5\":\"1124\",\"6\":\"977\",\"_rn_\":\"9\"},{\"1\":\"Pt3\",\"2\":\"SRR3083841\",\"3\":\"1042\",\"4\":\"1093\",\"5\":\"1146\",\"6\":\"0\",\"_rn_\":\"10\"},{\"1\":\"Pt17\",\"2\":\"SRR4289723\",\"3\":\"744\",\"4\":\"793\",\"5\":\"849\",\"6\":\"733\",\"_rn_\":\"11\"},{\"1\":\"Pt28\",\"2\":\"SRR3083851\",\"3\":\"678\",\"4\":\"784\",\"5\":\"483\",\"6\":\"405\",\"_rn_\":\"12\"},{\"1\":\"Pt33\",\"2\":\"SRR4289734\",\"3\":\"579\",\"4\":\"652\",\"5\":\"668\",\"6\":\"335\",\"_rn_\":\"13\"},{\"1\":\"Pt19\",\"2\":\"SRR3083847\",\"3\":\"562\",\"4\":\"584\",\"5\":\"655\",\"6\":\"562\",\"_rn_\":\"14\"},{\"1\":\"Pt31\",\"2\":\"SRR4289730\",\"3\":\"529\",\"4\":\"578\",\"5\":\"621\",\"6\":\"351\",\"_rn_\":\"15\"},{\"1\":\"Pt30\",\"2\":\"SRR4289728\",\"3\":\"494\",\"4\":\"512\",\"5\":\"565\",\"6\":\"311\",\"_rn_\":\"16\"},{\"1\":\"Pt15\",\"2\":\"SRR3083845\",\"3\":\"489\",\"4\":\"533\",\"5\":\"523\",\"6\":\"459\",\"_rn_\":\"17\"},{\"1\":\"Pt16\",\"2\":\"SRR4289721\",\"3\":\"465\",\"4\":\"495\",\"5\":\"526\",\"6\":\"286\",\"_rn_\":\"18\"},{\"1\":\"Pt20\",\"2\":\"SRR3083872\",\"3\":\"451\",\"4\":\"490\",\"5\":\"577\",\"6\":\"475\",\"_rn_\":\"19\"},{\"1\":\"Pt9\",\"2\":\"SRR3083849\",\"3\":\"429\",\"4\":\"456\",\"5\":\"495\",\"6\":\"436\",\"_rn_\":\"20\"}],\"options\":{\"columns\":{\"min\":{},\"max\":[10],\"total\":[6]},\"rows\":{\"min\":[10],\"max\":[10],\"total\":[20]},\"pages\":{}}}
+  </script>
+</div>
+
+<!-- rnb-frame-end -->
+"

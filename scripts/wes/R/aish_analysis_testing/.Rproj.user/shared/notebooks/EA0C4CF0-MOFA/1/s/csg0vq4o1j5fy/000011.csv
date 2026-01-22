@@ -1,0 +1,8 @@
+"0","# Extract clinical data from the MAF object"
+"0","maf_metadata <- getClinicalData(merged_maf)"
+"0",""
+"0","# Create the lookup: lookup[""SRR_RNA_ID""] -> ""Tumor_Sample_Barcode"""
+"0","# Note: Check if the column is 'SRA.Run.ID..tumor.WES' or 'SRA.Run.ID..tumor.RNA' "
+"0","# based on your mmc1.csv structure."
+"0","id_lookup <- setNames(maf_metadata$Tumor_Sample_Barcode, "
+"0","                      maf_metadata$SRA.Run.ID..tumor.RNA)"

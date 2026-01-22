@@ -1,0 +1,935 @@
+---
+title: "deseq2"
+output: html_document
+---
+
+```{r}
+libs <- c("data.table","DESeq2","ggplot2","pheatmap","matrixStats","tximport")
+invisible(lapply(libs, require, character.only = TRUE))
+
+```
+
+```{r}
+library(data.table)
+
+fc <- fread("/rds/projects/e/elhamsak-group5/main_project/data/rnaseq_counts/gene_counts.txt", skip = "#", data.table = FALSE)
+
+# Keep only Geneid + sample columns (drop Chr/Start/End/Strand/Length)
+count_matrix <- fc[, 7:ncol(fc)]
+rownames(count_matrix) <- fc$Geneid
+
+# Clean sample names (keep SRR... and remove BAM suffix)
+colnames(count_matrix) <- sub("_Aligned\\.sortedByCoord\\.out\\.bam$", "",
+                              basename(colnames(count_matrix)))
+
+count_matrix <- as.matrix(count_matrix)
+storage.mode(count_matrix) <- "integer"
+
+dim(count_matrix)
+summary(colSums(count_matrix))
+
+summary(colSums(count_matrix >= 10))
+
+```
+
+```{r}
+meta_raw <- read.csv("/rds/projects/e/elhamsak-group5/main_project/data/meta_data/SraRunTable.csv", stringsAsFactors = FALSE)
+
+dim(meta_raw)
+colnames(meta_raw)
+head(meta_raw[, 1:6])
+
+```
+
+```{r}
+head(colnames(count_matrix))
+head(meta_raw$Run)
+
+all(colnames(count_matrix) %in% meta_raw$Run)
+
+```
+
+
+```{r}
+keep <- rowSums(count_matrix >= 10) >= ceiling(0.1 * ncol(count_matrix))
+sum(keep)     # number of genes kept
+```
+
+
+```{r}
+meta_min <- data.frame(
+  sample_id = meta_raw$Run,
+  response  = meta_raw$anti.pd.1_response,
+  stringsAsFactors = FALSE
+)
+
+rownames(meta_min) <- meta_min$sample_id
+
+meta_min <- meta_min[colnames(count_matrix), , drop = FALSE]
+stopifnot(all(rownames(meta_min) == colnames(count_matrix)))
+
+meta_min$response <- factor(meta_min$response)
+table(meta_min$response)
+
+```
+
+```{r}
+meta_qc <- data.frame(
+  sample_id     = meta_raw$Run,
+  response      = meta_raw$anti.pd.1_response,
+  gender        = meta_raw$gender,
+  disease_status= meta_raw$disease_status,
+  vital_status  = meta_raw$vital_status,
+  study_site    = meta_raw$study_site,
+  braf          = meta_raw$braf,
+  nras          = meta_raw$nras,
+  nf1           = meta_raw$nf1,
+  stringsAsFactors = FALSE
+)
+
+rownames(meta_qc) <- meta_qc$sample_id
+meta_qc <- meta_qc[colnames(count_matrix), , drop = FALSE]
+stopifnot(all(rownames(meta_qc) == colnames(count_matrix)))
+
+```
+
+```{r}
+#dds <- DESeqDataSetFromMatrix(countData = count_matrix[keep, ], colData = meta_min, design = ~ response)
+
+#levels(meta_min$response)
+
+meta_min$response <- factor(
+  meta_min$response,
+  levels = c("Complete Response", "Partial Response", "Progressive Disease"),
+  labels = c("Complete_Response", "Partial_Response", "Progressive_Disease")
+)
+
+levels(meta_min$response)
+
+dds <- DESeqDataSetFromMatrix(countData = count_matrix[keep, ], colData = meta_min, design = ~ response)
+```
+
+```{r}
+dds <- DESeq(dds)
+dds
+
+summary(sizeFactors(dds))
+
+
+vsd <- vst(dds, blind = TRUE)
+vsd
+
+```
+```{r}
+vst_mat <- assay(vsd)
+
+pca <- prcomp(t(vst_mat), scale. = FALSE)
+
+summary(pca)
+```
+
+```{r}
+pca_df <- data.frame(
+  sample   = rownames(pca$x),
+  PC1      = pca$x[,1],
+  PC2      = pca$x[,2],
+  response = meta_min$response
+)
+
+library(ggplot2)
+
+pdf("PCA_PC1_PC2.pdf", width = 6, height = 5)
+
+ggplot(pca_df, aes(PC1, PC2, color = response)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(
+    title = "PCA of VST-normalized RNA-seq",
+    x = "PC1",
+    y = "PC2"
+  )
+
+dev.off()
+
+
+```
+
+```{r}
+levels(meta_min$response)
+
+meta_min$response_bin <- ifelse(
+  meta_min$response %in% c("Complete_Response", "Partial_Response"),
+  "Responder",
+  "Progressive"
+)
+
+meta_min$response_bin <- factor(meta_min$response_bin)
+
+table(meta_min$response_bin)
+
+```
+```{r}
+dds_bin <- DESeqDataSetFromMatrix(
+  countData = count_matrix[keep, ],
+  colData   = meta_min,
+  design    = ~ response_bin
+)
+
+dds_bin <- DESeq(dds_bin)
+
+```
+```{r}
+res <- results(dds_bin)
+summary(res)
+
+head(res)
+sum(is.na(res$padj))
+summary(res$log2FoldChange)
+
+```
+```{r}
+res_df <- as.data.frame(res)
+res_df$gene <- rownames(res_df)
+
+# Order by adjusted p-value
+res_df <- res_df[order(res_df$padj), ]
+
+head(res_df, 20)
+
+```
+```{r}
+if (!requireNamespace("ashr", quietly = TRUE)) {
+  install.packages("ashr")
+}
+library(ashr)
+
+```
+
+```{r}
+resultsNames(dds_bin)
+
+```
+
+```{r}
+res_shrunk <- lfcShrink(
+  dds_bin,
+  coef = "response_bin_Responder_vs_Progressive",
+  type = "ashr"
+)
+
+```
+
+```{r}
+summary(res_shrunk$log2FoldChange)
+
+```
+
+```{r}
+res_shrunk_df <- as.data.frame(res_shrunk)
+res_shrunk_df$gene <- rownames(res_shrunk_df)
+res_shrunk_df <- res_shrunk_df[order(res_shrunk_df$padj), ]
+
+head(res_shrunk_df, 10)
+
+```
+```{r}
+res_shrunk_df <- as.data.frame(res_shrunk)
+res_shrunk_df$gene <- rownames(res_shrunk_df)
+
+res_shrunk_df$absLFC <- abs(res_shrunk_df$log2FoldChange)
+
+robust_de <- subset(
+  res_shrunk_df,
+  padj < 0.1 & absLFC < 8 & baseMean > 20
+)
+
+nrow(robust_de)
+
+```
+
+
+```{r}
+
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+
+robust_de$ensembl <- gsub("\\..*", "", robust_de$gene)
+
+robust_de$symbol <- mapIds(
+  org.Hs.eg.db,
+  keys = robust_de$ensembl,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+```
+```{r}
+head(robust_de[order(robust_de$padj), c("symbol","log2FoldChange","padj")], 20)
+
+```
+```{r}
+library(GSEABase)
+library(GSVA)
+library(msigdbr)
+
+msig <- msigdbr(species = "Homo sapiens", category = "H")
+hallmark <- split(msig$gene_symbol, msig$gs_name)
+
+```
+
+```{r}
+vst_mat <- assay(vsd)
+```
+
+```{r}
+
+ens <- gsub("\\..*", "", rownames(vst_mat))
+head(ens)
+
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+
+symbols <- mapIds(
+  org.Hs.eg.db,
+  keys = ens,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+# Keep only mapped genes
+keep_sym <- !is.na(symbols)
+vst_sym <- vst_mat[keep_sym, ]
+rownames(vst_sym) <- symbols[keep_sym]
+
+# If multiple Ensembl IDs map to same symbol, keep the one with highest average expression
+avg_expr <- rowMeans(vst_sym)
+vst_sym <- vst_sym[order(avg_expr, decreasing = TRUE), ]
+vst_sym <- vst_sym[!duplicated(rownames(vst_sym)), ]
+
+```
+```{r}
+sum(duplicated(rownames(vst_sym)))   # should be 0
+dim(vst_sym)
+head(rownames(vst_sym))
+
+```
+
+```{r}
+param <- ssgseaParam(exprData = vst_sym, geneSets = hallmark)
+gsva_scores <- gsva(param)
+
+dim(gsva_scores)
+
+```
+
+```{r}
+pathway_df <- data.frame(
+  t(gsva_scores),
+  response = meta_min$response_bin
+)
+
+```
+
+```{r}
+all(colnames(gsva_scores) == rownames(meta_min))
+
+meta_for_gsva <- meta_min[colnames(gsva_scores), , drop = FALSE]
+stopifnot(all(rownames(meta_for_gsva) == colnames(gsva_scores)))
+
+library(limma)
+
+design <- model.matrix(~ response_bin, data = meta_for_gsva)
+fit <- lmFit(gsva_scores, design)
+fit <- eBayes(fit)
+
+
+```
+```{r}
+top_paths <- topTable(fit, coef = "response_binResponder", number = 20)
+top_paths
+
+```
+```{r}
+library(pheatmap)
+
+ann <- data.frame(Response = meta_min$response_bin)
+rownames(ann) <- rownames(meta_min)
+
+top_pathways <- rownames(top_paths)
+
+pdf("GSVA_hallmark_heatmap.pdf", width = 9, height = 7)
+
+pheatmap(
+  gsva_scores[top_pathways, ],
+  annotation_col = ann,
+  scale = "row",
+  clustering_distance_cols = "correlation",
+  clustering_distance_rows = "correlation",
+  show_colnames = FALSE,
+  main = "Hallmark Pathway Activity in Pembrolizumab Response"
+)
+
+dev.off()
+
+```
+```{r}
+genes_to_plot <- c(
+  "AXL","ROR2","WNT5A","TAGLN",
+  "LOXL2","TWIST2","CDH1","FAP",
+  "CCL2","CCL7","CCL8","CCL13",
+  "IL10","VEGFC","VEGFA"
+)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+# Ensure metadata is aligned to vst_sym columns
+meta_plot <- meta_min[colnames(vst_sym), , drop = FALSE]
+stopifnot(all(rownames(meta_plot) == colnames(vst_sym)))
+
+# Keep only genes present
+genes_present <- intersect(genes_to_plot, rownames(vst_sym))
+
+plot_df <- as.data.frame(t(vst_sym[genes_present, , drop = FALSE]))
+plot_df$sample <- rownames(plot_df)
+plot_df$response <- meta_plot$response_bin
+
+plot_long <- plot_df %>%
+  pivot_longer(cols = all_of(genes_present), names_to = "gene", values_to = "expr")
+
+```
+```{r}
+library(rstatix)
+
+pvals <- plot_long %>%
+  group_by(gene) %>%
+  wilcox_test(expr ~ response) %>%
+  mutate(p_label = paste0("p=", signif(p, 2))) %>%
+  select(gene, p_label)
+
+```
+```{r}
+library(ggplot2)
+
+plot_long <- plot_long %>%
+  mutate(response = factor(response, levels = c("Progressive", "Responder"),
+                           labels = c("Non-responding", "Responding")))
+
+pdf("gene_panels_boxplot.pdf", width = 10, height = 7)
+
+ggplot(plot_long, aes(x = response, y = expr)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, size = 1, alpha = 0.7) +
+  facet_wrap(~ gene, scales = "free_y", ncol = 4) +
+  theme_bw() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "italic"),
+    axis.title.x = element_blank()
+  ) +
+  labs(y = "VST expression") +
+  geom_text(
+    data = pvals,
+    aes(x = 1.5, y = Inf, label = p_label),
+    inherit.aes = FALSE,
+    vjust = 1.2,
+    size = 3
+  )
+
+dev.off()
+
+```
+```{r}
+# Pick pathways you want in the heatmap (start with 20–30)
+sig_paths <- c(
+  # EMT / invasion / metastasis
+  "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+
+  # Angiogenesis / hypoxia / metabolism
+  "HALLMARK_ANGIOGENESIS",
+  "HALLMARK_HYPOXIA",
+  "HALLMARK_GLYCOLYSIS",
+
+  # TGFβ / WNT
+  "HALLMARK_TGF_BETA_SIGNALING",
+  "HALLMARK_WNT_BETA_CATENIN_SIGNALING",
+
+  # Wound healing / inflammation
+  "HALLMARK_COMPLEMENT",
+  "HALLMARK_INFLAMMATORY_RESPONSE",
+  "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+
+  # Interferon / immune activation
+  "HALLMARK_INTERFERON_GAMMA_RESPONSE",
+  "HALLMARK_INTERFERON_ALPHA_RESPONSE",
+  "HALLMARK_IL2_STAT5_SIGNALING"
+)
+
+sig_paths <- intersect(sig_paths, rownames(gsva_scores))
+
+# Row block labels (edit as desired)
+row_block <- rep(NA_character_, length(sig_paths))
+names(row_block) <- sig_paths
+
+row_block[c("HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION")] <- "EMT / Metastasis"
+row_block[c("HALLMARK_ANGIOGENESIS")] <- "Angiogenesis"
+row_block[c("HALLMARK_HYPOXIA","HALLMARK_GLYCOLYSIS")] <- "Hypoxia / Metabolism"
+row_block[c("HALLMARK_TGF_BETA_SIGNALING","HALLMARK_WNT_BETA_CATENIN_SIGNALING")] <- "TGFβ / WNT"
+row_block[c("HALLMARK_COMPLEMENT","HALLMARK_INFLAMMATORY_RESPONSE","HALLMARK_TNFA_SIGNALING_VIA_NFKB")] <- "Wound/Inflammation"
+row_block[c("HALLMARK_INTERFERON_GAMMA_RESPONSE","HALLMARK_INTERFERON_ALPHA_RESPONSE","HALLMARK_IL2_STAT5_SIGNALING")] <- "Interferon / Immune"
+
+```
+
+```{r}
+if (!requireNamespace("ComplexHeatmap", quietly = TRUE)) {
+  install.packages("BiocManager")
+  BiocManager::install("ComplexHeatmap", update = FALSE, ask = FALSE)
+}
+library(ComplexHeatmap)
+library(circlize)
+
+# Row Z-score
+mat_z <- t(scale(t(mat)))
+mat_z[is.na(mat_z)] <- 0
+
+# Row annotation (block labels)
+row_ha <- rowAnnotation(
+  Block = factor(row_block[rownames(mat_z)],
+                 levels = c("EMT / Metastasis","Angiogenesis","Hypoxia / Metabolism",
+                            "TGFβ / WNT","Wound/Inflammation","Interferon / Immune"))
+)
+
+# Column split
+col_split <- grp_ordered
+
+pdf("Signature_heatmap_like_paper.pdf", width = 9, height = 6)
+
+ht <- Heatmap(
+  mat_z,
+  name = "Row Z-score",
+  col = colorRamp2(c(-2, 0, 2), c("blue", "white", "red")),
+  cluster_rows = TRUE,
+  cluster_columns = FALSE,         # keep group ordering
+  column_split = col_split,        # adds the left/right group split
+  show_column_names = FALSE,
+  row_names_side = "right",
+  row_title = NULL,
+  column_title = NULL,
+  heatmap_legend_param = list(at = c(-2, -1, 0, 1, 2))
+)
+
+draw(ht + row_ha)
+dev.off()
+
+```
+```{r}
+topN <- 50  # try 30, 50, 100
+deg_symbols <- robust_de %>%
+  dplyr::filter(!is.na(symbol)) %>%
+  dplyr::arrange(padj) %>%
+  dplyr::pull(symbol) %>%
+  unique() %>%
+  head(topN)
+
+```
+
+```{r}
+deg_symbols <- c("AXL","ROR2","LOXL2","VEGFC","FLT1","ANGPT2","IL10","CDH1")
+
+```
+
+```{r}
+# Order samples: Non-responding first
+grp <- factor(meta_min$response_bin,
+              levels = c("Progressive", "Responder"),
+              labels = c("Non-responding", "Responding"))
+
+sample_order <- order(grp)
+samples <- rownames(meta_min)[sample_order]
+
+# Pull expression from your symbol-mapped VST matrix
+deg_symbols <- intersect(deg_symbols, rownames(vst_sym))
+mat <- vst_sym[deg_symbols, samples, drop = FALSE]
+
+```
+
+```{r}
+mat_z <- t(scale(t(mat)))
+mat_z[is.na(mat_z)] <- 0
+
+```
+
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+
+# Top annotation bar
+top_ha <- HeatmapAnnotation(
+  Response = grp[sample_order],
+  col = list(Response = c("Non-responding" = "red", "Responding" = "blue")),
+  show_annotation_name = FALSE
+)
+
+pdf("DEG_heatmap.pdf", width = 10, height = 6)
+
+ht <- Heatmap(
+  mat_z,
+  name = "Row Z-score",
+  col = colorRamp2(c(-2, 0, 2), c("green", "black", "red")),  # match the example style
+  top_annotation = top_ha,
+
+  cluster_rows = TRUE,
+  cluster_columns = FALSE,              # keep Non-responding left, Responding right
+  column_split = grp[sample_order],
+
+  column_title = c(
+    paste0("Non-responding (n=", sum(grp == "Non-responding"), ")"),
+    paste0("Responding (n=", sum(grp == "Responding"), ")")
+  ),
+
+  show_column_names = FALSE,
+  row_names_side = "right",
+  row_names_gp = grid::gpar(fontface = "italic"),
+  heatmap_legend_param = list(at = c(-2, -1, 0, 1, 2))
+)
+
+draw(ht, heatmap_legend_side = "left", annotation_legend_side = "left")
+dev.off()
+
+```
+
+
+```{r}
+
+library(DESeq2)
+
+norm_counts <- counts(dds_bin, normalized = TRUE)
+
+ens <- gsub("\\..*", "", rownames(norm_counts))
+
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+
+symbols <- mapIds(
+  org.Hs.eg.db,
+  keys = ens,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+keep <- !is.na(symbols)
+expr <- norm_counts[keep, ]
+rownames(expr) <- symbols[keep]
+
+expr <- expr[order(rowMeans(expr), decreasing = TRUE), ]
+expr <- expr[!duplicated(rownames(expr)), ]
+
+ciber_mat <- data.frame(GeneSymbol = rownames(expr), expr, check.names = FALSE)
+
+write.table(
+  ciber_mat,
+  file = "CIBERSORTx_input.txt",
+  sep = "\t",
+  row.names = FALSE,
+  quote = FALSE
+)
+
+```
+
+```{r}
+dim(ciber_mat)
+head(ciber_mat[,1:3])
+sum(duplicated(ciber_mat$GeneSymbol))  # must be 0
+
+```
+```{r}
+ciber <- read.csv("/rds/projects/e/elhamsak-group5/main_project/data/cibersortx/CIBERSORTx_Results.csv", row.names = 1, check.names = FALSE)
+
+cell_cols <- setdiff(colnames(ciber), c("P.value", "Correlation", "RMSE"))
+
+frac <- ciber[, cell_cols]
+
+
+summary(frac)
+
+```
+```{r}
+head(meta_min$response_bin)
+names(meta_min$response_bin)[1:6]
+
+
+names(meta_min$response_bin) <- rownames(meta_min)
+
+frac$response <- meta_min[rownames(frac), "response_bin"]
+
+table(frac$response, useNA = "ifany")
+
+```
+
+```{r}
+frac$response <- meta_min[rownames(frac), "response_bin"]
+
+table(frac$response, useNA = "ifany")
+
+
+```
+
+```{r}
+cell_types <- setdiff(colnames(frac), "response")
+
+pvals <- sapply(cell_types, function(ct){
+  wilcox.test(frac[frac$response=="Progressive", ct],
+              frac[frac$response=="Responder", ct],
+              exact = FALSE)$p.value
+})
+
+ciber_stats <- data.frame(
+  Cell = cell_types,
+  p = pvals,
+  padj = p.adjust(pvals, "BH")
+)
+
+head(ciber_stats[order(ciber_stats$p), ], 10)
+
+
+```
+```{r}
+top_cells <- ciber_stats$Cell[order(ciber_stats$p)][1:6]
+
+pdf("CIBERSORT_top_cells_boxplots.pdf", width = 10, height = 6)
+par(mfrow=c(2,3))
+for (ct in top_cells){
+  boxplot(frac[[ct]] ~ frac$response, main = ct, ylab="Fraction")
+}
+dev.off()
+
+```
+
+```{r}
+mat <- as.matrix(frac[, cell_types])
+mat <- mat[order(frac$response), , drop=FALSE]
+
+mat_z <- t(scale(t(mat)))
+mat_z[is.na(mat_z)] <- 0
+
+library(ComplexHeatmap)
+library(circlize)
+
+grp <- frac$response[rownames(mat_z)]
+top_ha <- HeatmapAnnotation(
+  Response = grp,
+  col = list(Response = c("Progressive"="red", "Responder"="blue")),
+  show_annotation_name = FALSE
+)
+
+pdf("CIBERSORT_immune_heatmap.pdf", width=9, height=6)
+Heatmap(mat_z,
+        name="Row Z-score",
+        col=colorRamp2(c(-2,0,2), c("blue","white","red")),
+        top_annotation=top_ha,
+        cluster_columns=TRUE,
+        cluster_rows=TRUE,
+        show_column_names=FALSE)
+dev.off()
+
+```
+```{r}
+immune_cells <- c(
+  "Eosinophils",
+  "T cells regulatory (Tregs)",
+  "Macrophages M2",
+  "NK cells activated"
+)
+
+immune_cells <- immune_cells[immune_cells %in% colnames(frac)]
+immune_cells
+
+```
+
+```{r}
+pathways <- c(
+  "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  "HALLMARK_TGF_BETA_SIGNALING",
+  "HALLMARK_ANGIOGENESIS"
+)
+
+gsva_sub <- t(gsva_scores[pathways, rownames(frac)])
+head(gsva_sub)
+
+```
+```{r}
+cor_results <- expand.grid(
+  Immune = immune_cells,
+  Pathway = pathways,
+  stringsAsFactors = FALSE
+)
+
+cor_results$rho <- NA
+cor_results$p <- NA
+
+for (i in seq_len(nrow(cor_results))) {
+  ic <- cor_results$Immune[i]
+  pw <- cor_results$Pathway[i]
+
+  ct <- cor.test(
+    frac[[ic]],
+    gsva_sub[, pw],
+    method = "spearman"
+  )
+
+  cor_results$rho[i] <- ct$estimate
+  cor_results$p[i] <- ct$p.value
+}
+
+cor_results$padj <- p.adjust(cor_results$p, method = "BH")
+cor_results
+
+```
+```{r}
+# --- Inputs assumed to exist ---
+# frac: CIBERSORT fractions with a column "T cells regulatory (Tregs)"
+# gsva_sub: data.frame/matrix with columns:
+#   HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION
+#   HALLMARK_TGF_BETA_SIGNALING
+#   HALLMARK_ANGIOGENESIS
+# rownames(frac) match rownames(gsva_sub)
+
+stopifnot(all(rownames(frac) == rownames(gsva_sub)))
+
+treg <- frac[["T cells regulatory (Tregs)"]]
+
+panels <- list(
+  EMT = "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  `TGF-β` = "HALLMARK_TGF_BETA_SIGNALING",
+  Angiogenesis = "HALLMARK_ANGIOGENESIS"
+)
+
+pdf("Tregs_vs_ExclusionPrograms.pdf", width = 10, height = 3.6)
+par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+
+for (nm in names(panels)) {
+  pw <- panels[[nm]]
+  x <- gsva_sub[, pw]
+
+  ct <- cor.test(treg, x, method = "spearman", exact = FALSE)
+
+  plot(
+    x, treg,
+    pch = 16,
+    xlab = paste0(nm, " GSVA score"),
+    ylab = "Treg fraction (CIBERSORTx)",
+    main = paste0("Tregs vs ", nm)
+  )
+
+  # Add a simple trend line (visual aid)
+  abline(lm(treg ~ x), lwd = 2)
+
+  # Annotate stats
+  legend_txt <- paste0(
+    "rho = ", round(unname(ct$estimate), 2),
+    "\n", "p = ", format.pval(ct$p.value, digits = 2)
+  )
+  mtext(legend_txt, side = 3, line = -1.2, adj = 0, cex = 0.85)
+}
+
+dev.off()
+
+```
+```{r}
+ipres_pathways <- c(
+  "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
+  "HALLMARK_TGF_BETA_SIGNALING",
+  "HALLMARK_ANGIOGENESIS",
+  "HALLMARK_WOUND_HEALING",
+  "HALLMARK_HYPOXIA"
+)
+
+# keep only those present
+ipres_pathways <- ipres_pathways[ipres_pathways %in% rownames(gsva_scores)]
+
+# IPRES score = mean GSVA score across pathways
+ipres_score <- colMeans(gsva_scores[ipres_pathways, ], na.rm = TRUE)
+
+summary(ipres_score)
+
+```
+
+
+```{r}
+ipres_status <- ifelse(
+  ipres_score >= median(ipres_score, na.rm = TRUE),
+  "Enriched",
+  "Not enriched"
+)
+
+ipres_status <- factor(ipres_status, levels = c("Enriched", "Not enriched"))
+table(ipres_status)
+
+```
+
+```{r}
+os <- read.csv("/rds/projects/e/elhamsak-group5/main_project/data/meta_data/os_survival.csv", stringsAsFactors = FALSE)
+
+# time in years (to match the paper figure)
+os$time_years <- os$os_time / 365.25
+
+# event: 1 = death, 0 = censored
+os$event <- ifelse(os$status == "Dead", 1, 0)
+
+# attach IPRES
+os$IPRES <- ipres_status[os$SRA_ID]
+
+table(os$IPRES, useNA = "ifany")
+
+```
+
+```{r}
+library(survival)
+
+surv_obj <- Surv(os$time_years, os$event)
+fit <- survfit(surv_obj ~ IPRES, data = os)
+
+# log-rank test
+lr <- survdiff(surv_obj ~ IPRES, data = os)
+pval <- 1 - pchisq(lr$chisq, df = 1)
+
+pdf("IPRES_KM.pdf", width = 5, height = 4)
+
+plot(
+  fit,
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  mark.time = TRUE,
+  xlab = "Survival (years)",
+  ylab = "Fraction surviving",
+  main = "IPRES signature",
+  xaxs = "i",
+  yaxs = "i"
+)
+
+legend(
+  "topright",
+  legend = c("Enriched", "Not enriched"),
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  bty = "n"
+)
+
+text(
+  x = max(os$time_years, na.rm = TRUE) * 0.7,
+  y = 0.25,
+  labels = paste0("p=", format.pval(pval, digits = 2))
+)
+
+dev.off()
+
+```
+

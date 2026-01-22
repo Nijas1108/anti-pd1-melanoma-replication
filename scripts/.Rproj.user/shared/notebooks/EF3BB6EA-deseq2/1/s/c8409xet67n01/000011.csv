@@ -1,0 +1,8 @@
+"0","topN <- 50  # try 30, 50, 100"
+"0","deg_symbols <- robust_de %>%"
+"0","  dplyr::filter(!is.na(symbol)) %>%"
+"0","  dplyr::arrange(padj) %>%"
+"0","  dplyr::pull(symbol) %>%"
+"0","  unique() %>%"
+"0","  head(topN)"
+"0",""

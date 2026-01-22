@@ -1,0 +1,14 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBDaGVjayBjbGluaWNhbCBkYXRhIHN1bW1hcnlcbmdldFNhbXBsZVN1bW1hcnkobWVyZ2VkX21hZilcbmBgYCJ9 -->
+
+```r
+# Check clinical data summary
+getSampleSummary(merged_maf)
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+# Check clinical data summary
+getSampleSummary(merged_maf)
+```"

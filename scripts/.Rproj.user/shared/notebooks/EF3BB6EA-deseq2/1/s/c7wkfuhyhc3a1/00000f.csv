@@ -1,0 +1,25 @@
+"0","res_mcp <- deconvolute("
+"2","Warning messages:
+"
+"2","1: replacing previous import ‘GenomeInfoDb::seqinfo<-’ by ‘GenomicRanges::seqinfo<-’ when loading ‘SummarizedExperiment’ 
+"
+"2","2: replacing previous import ‘GenomeInfoDb::seqinfo’ by ‘GenomicRanges::seqinfo’ when loading ‘SummarizedExperiment’ 
+"
+"2","3: replacing previous import ‘GenomeInfoDb::seqnames’ by ‘GenomicRanges::seqnames’ when loading ‘SummarizedExperiment’ 
+"
+"2","4: replacing previous import ‘GenomeInfoDb::seqnames<-’ by ‘GenomicRanges::seqnames<-’ when loading ‘SummarizedExperiment’ 
+"
+"2","5: multiple methods tables found for ‘seqinfo’ 
+"
+"2","6: multiple methods tables found for ‘seqinfo<-’ 
+"
+"2","7: multiple methods tables found for ‘seqnames’ 
+"
+"2","8: multiple methods tables found for ‘seqnames<-’ 
+"
+"0","  vst_sym,"
+"0","  method = ""mcp_counter"""
+"0",")"
+"2","Error in deconvolute(vst_sym, method = ""mcp_counter"") : 
+  could not find function ""deconvolute""
+"

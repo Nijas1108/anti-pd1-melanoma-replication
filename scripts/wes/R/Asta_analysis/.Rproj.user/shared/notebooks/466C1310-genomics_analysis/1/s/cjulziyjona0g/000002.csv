@@ -1,0 +1,30 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuXG5iZWRfZmlsZSA8LSBcIi9yZHMvcHJvamVjdHMvZS9lbGhhbXNhay1ncm91cDUvbWFpbl9wcm9qZWN0L3JlZmVyZW5jZV9nZW5vbWUvVHdpc3RfRXhvbWVfQ29yZV9oZzM4X3BhZGRlZC5iZWRcIlxuXG5nciA8LSBpbXBvcnQoYmVkX2ZpbGUpICAgICAgIyBHUmFuZ2VzXG5ncl9yZWQgPC0gcmVkdWNlKGdyKSAgICAgICAgIyBtZXJnZSBvdmVybGFwc1xuY2FwdHVyZV9icCA8LSBzdW0od2lkdGgoZ3JfcmVkKSlcbmNhcHR1cmVfbWIgPC0gY2FwdHVyZV9icCAvIDFlNlxuXG5jYXB0dXJlX21iXG5gYGAifQ== -->
+
+```r
+
+bed_file <- \"/rds/projects/e/elhamsak-group5/main_project/reference_genome/Twist_Exome_Core_hg38_padded.bed\"
+
+gr <- import(bed_file)      # GRanges
+gr_red <- reduce(gr)        # merge overlaps
+capture_bp <- sum(width(gr_red))
+capture_mb <- capture_bp / 1e6
+
+capture_mb
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+
+bed_file <- \"/rds/projects/e/elhamsak-group5/main_project/reference_genome/Twist_Exome_Core_hg38_padded.bed\"
+
+gr <- import(bed_file)      # GRanges
+gr_red <- reduce(gr)        # merge overlaps
+capture_bp <- sum(width(gr_red))
+capture_mb <- capture_bp / 1e6
+
+capture_mb
+```"
+"1","[1] 69.84948
+"

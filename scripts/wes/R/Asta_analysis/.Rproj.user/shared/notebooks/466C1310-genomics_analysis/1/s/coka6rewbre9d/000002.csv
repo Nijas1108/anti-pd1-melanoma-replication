@@ -1,0 +1,49 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuY29sbmFtZXMoY2xpbl9kZilcbmBgYCJ9 -->
+
+```r
+colnames(clin_df)
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+colnames(clin_df)
+```"
+"1"," [1] \"Patient.ID\"                  \"irRECIST\"                    \"Study.site\"                 
+ [4] \"Gender\"                      \"Age\"                         \"Disease.Status\"             
+ [7] \"Overall.Survival\"            \"Vital.Status\"                \"Previous.MAPKi\"             
+[10] \"Anatomical.Location\"         \"BRAF\"                        \"NRAS\"                       
+[13] \"NF1\"                         \"Treatment\"                   \"Biopsy.Time\"                
+[16] \"WES\"                         \"RNAseq\"                      \"Tumor_Sample_Barcode\"       
+[19] \"Matched_Norm_Sample_Barcode\" \"AccessionID..WES\"            \"SRA.Run.ID..tumor.RNA\"      
+[22] \"Accession.ID..RNAseq\"       
+"
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBhZGQgbW9yZSBtZXRhIGRhdGEgdG8gZGZcbmNsaW5fc3Vic2V0IDwtIGNsaW5fZGYgJT4lXG4gIHNlbGVjdChcbiAgICBUdW1vcl9TYW1wbGVfQmFyY29kZSxcbiAgICBBZ2UsIEdlbmRlciwgRGlzZWFzZS5TdGF0dXMsIE92ZXJhbGwuU3Vydml2YWwsIFZpdGFsLlN0YXR1c1xuICApIFxuc252X3dpdGhfY2xpbiA8LSBuc1NOVl9ieV9zYW1wbGUgJT4lXG4gIGxlZnRfam9pbihjbGluX3N1YnNldCwgYnkgPSBcIlR1bW9yX1NhbXBsZV9CYXJjb2RlXCIpXG5cbmBgYCJ9 -->
+
+```r
+# add more meta data to df
+clin_subset <- clin_df %>%
+  select(
+    Tumor_Sample_Barcode,
+    Age, Gender, Disease.Status, Overall.Survival, Vital.Status
+  ) 
+snv_with_clin <- nsSNV_by_sample %>%
+  left_join(clin_subset, by = \"Tumor_Sample_Barcode\")
+
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+# add more meta data to df
+clin_subset <- clin_df %>%
+  select(
+    Tumor_Sample_Barcode,
+    Age, Gender, Disease.Status, Overall.Survival, Vital.Status
+  ) 
+snv_with_clin <- nsSNV_by_sample %>%
+  left_join(clin_subset, by = \"Tumor_Sample_Barcode\")
+
+```"

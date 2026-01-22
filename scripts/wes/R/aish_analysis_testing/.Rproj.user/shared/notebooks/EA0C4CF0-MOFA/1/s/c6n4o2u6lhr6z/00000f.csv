@@ -1,0 +1,11 @@
+"0","# 1. Save Total Variance Plot"
+"0","pdf(""MOFA_Total_Variance.pdf"", width = 7, height = 5)"
+"0","  plot_variance_explained(MOFA_result, plot_total = TRUE)"
+"1","[[1]]
+"
+"1","
+"
+"1","[[2]]
+"
+"1","
+"

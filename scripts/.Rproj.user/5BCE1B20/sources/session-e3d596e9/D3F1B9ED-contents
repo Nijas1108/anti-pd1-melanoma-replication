@@ -1,0 +1,200 @@
+---
+title: "deseq2"
+output: html_document
+---
+
+```{r}
+libs <- c("data.table","DESeq2","ggplot2","pheatmap","matrixStats","tximport")
+invisible(lapply(libs, require, character.only = TRUE))
+
+```
+
+```{r}
+library(data.table)
+
+fc <- fread("/rds/projects/e/elhamsak-group5/main_project/data/rnaseq_counts/gene_counts.txt", skip = "#", data.table = FALSE)
+
+# Keep only Geneid + sample columns (drop Chr/Start/End/Strand/Length)
+count_matrix <- fc[, 7:ncol(fc)]
+rownames(count_matrix) <- fc$Geneid
+
+# Clean sample names (keep SRR... and remove BAM suffix)
+colnames(count_matrix) <- sub("_Aligned\\.sortedByCoord\\.out\\.bam$", "",
+                              basename(colnames(count_matrix)))
+
+count_matrix <- as.matrix(count_matrix)
+storage.mode(count_matrix) <- "integer"
+
+dim(count_matrix)
+summary(colSums(count_matrix))
+
+summary(colSums(count_matrix >= 10))
+
+```
+
+```{r}
+meta_raw <- read.csv("/rds/projects/e/elhamsak-group5/main_project/data/meta_data/SraRunTable.csv", stringsAsFactors = FALSE)
+
+dim(meta_raw)
+colnames(meta_raw)
+head(meta_raw[, 1:6])
+
+```
+
+```{r}
+head(colnames(count_matrix))
+head(meta_raw$Run)
+
+all(colnames(count_matrix) %in% meta_raw$Run)
+
+```
+
+
+```{r}
+keep <- rowSums(count_matrix >= 10) >= ceiling(0.1 * ncol(count_matrix))
+sum(keep)     # number of genes kept
+```
+
+
+```{r}
+meta_min <- data.frame(
+  sample_id = meta_raw$Run,
+  response  = meta_raw$anti.pd.1_response,
+  stringsAsFactors = FALSE
+)
+
+rownames(meta_min) <- meta_min$sample_id
+
+meta_min <- meta_min[colnames(count_matrix), , drop = FALSE]
+stopifnot(all(rownames(meta_min) == colnames(count_matrix)))
+
+meta_min$response <- factor(meta_min$response)
+table(meta_min$response)
+
+```
+
+```{r}
+meta_qc <- data.frame(
+  sample_id     = meta_raw$Run,
+  response      = meta_raw$anti.pd.1_response,
+  gender        = meta_raw$gender,
+  disease_status= meta_raw$disease_status,
+  vital_status  = meta_raw$vital_status,
+  study_site    = meta_raw$study_site,
+  braf          = meta_raw$braf,
+  nras          = meta_raw$nras,
+  nf1           = meta_raw$nf1,
+  stringsAsFactors = FALSE
+)
+
+rownames(meta_qc) <- meta_qc$sample_id
+meta_qc <- meta_qc[colnames(count_matrix), , drop = FALSE]
+stopifnot(all(rownames(meta_qc) == colnames(count_matrix)))
+
+```
+
+```{r}
+#dds <- DESeqDataSetFromMatrix(countData = count_matrix[keep, ], colData = meta_min, design = ~ response)
+
+#levels(meta_min$response)
+
+meta_min$response <- factor(
+  meta_min$response,
+  levels = c("Complete Response", "Partial Response", "Progressive Disease"),
+  labels = c("Complete_Response", "Partial_Response", "Progressive_Disease")
+)
+
+levels(meta_min$response)
+
+dds <- DESeqDataSetFromMatrix(countData = count_matrix[keep, ], colData = meta_min, design = ~ response)
+```
+
+```{r}
+dds <- DESeq(dds)
+dds
+
+summary(sizeFactors(dds))
+
+
+vsd <- vst(dds, blind = TRUE)
+vsd
+
+```
+```{r}
+vst_mat <- assay(vsd)
+
+pca <- prcomp(t(vst_mat), scale. = FALSE)
+
+summary(pca)
+```
+
+```{r}
+pca_df <- data.frame(
+  sample   = rownames(pca$x),
+  PC1      = pca$x[,1],
+  PC2      = pca$x[,2],
+  response = meta_min$response
+)
+
+library(ggplot2)
+
+pdf("PCA_PC1_PC2.pdf", width = 6, height = 5)
+
+ggplot(pca_df, aes(PC1, PC2, color = response)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(
+    title = "PCA of VST-normalized RNA-seq",
+    x = "PC1",
+    y = "PC2"
+  )
+
+dev.off()
+
+
+```
+
+```{r}
+levels(meta_min$response)
+
+meta_min$response_bin <- ifelse(
+  meta_min$response %in% c("Complete_Response", "Partial_Response"),
+  "Responder",
+  "Progressive"
+)
+
+meta_min$response_bin <- factor(meta_min$response_bin)
+
+table(meta_min$response_bin)
+
+```
+```{r}
+dds_bin <- DESeqDataSetFromMatrix(
+  countData = count_matrix[keep, ],
+  colData   = meta_min,
+  design    = ~ response_bin
+)
+
+dds_bin <- DESeq(dds_bin)
+
+```
+```{r}
+res <- results(dds_bin)
+summary(res)
+
+head(res)
+sum(is.na(res$padj))
+summary(res$log2FoldChange)
+
+```
+```{r}
+res_df <- as.data.frame(res)
+res_df$gene <- rownames(res_df)
+
+# Order by adjusted p-value
+res_df <- res_df[order(res_df$padj), ]
+
+head(res_df, 20)
+
+```
+

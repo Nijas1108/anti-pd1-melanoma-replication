@@ -1,0 +1,39 @@
+"0","# Build MAF object to contain both maf and clinical data"
+"0","merged_maf <- read.maf(maf = combined_df,"
+"0","                       clinicalData = clinical_df_og)"
+"1","-Validating
+"
+"1","--Non MAF specific values in Variant_Classification column:
+"
+"1","  START_CODON_SNP
+"
+"1","  DE_NOVO_START_OUT_FRAME
+"
+"1","  DE_NOVO_START_IN_FRAME
+"
+"1","  COULD_NOT_DETERMINE
+"
+"1","-Silent variants: 90277"
+"1"," "
+"1","
+"
+"1","-Summarizing
+"
+"1","--Possible FLAGS among top ten genes:
+"
+"1","  TTN
+"
+"1","  MUC16
+"
+"1","  NEB
+"
+"1","-Processing clinical data
+"
+"1","-Finished in"
+"1"," "
+"1","1.870s elapsed (1.835s cpu)"
+"1"," "
+"1","
+"
+"0","# Check summary"
+"0","getSampleSummary(merged_maf)"

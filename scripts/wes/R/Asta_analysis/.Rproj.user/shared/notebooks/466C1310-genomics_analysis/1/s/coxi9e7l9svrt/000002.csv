@@ -1,0 +1,48 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShzdXJ2aXZhbClcbiMgaW5zdGFsbC5wYWNrYWdlcyhcInN1cnZtaW5lclwiKSBpZiBuZWVkZWRcbmxpYnJhcnkoc3Vydm1pbmVyKVxuXG5kZmttIDwtIGRmcCAlPiUgZmlsdGVyKCFpcy5uYShPU19ldmVudCkpXG5cbmRma20gPC0gZGZrbSAlPiVcbiAgbXV0YXRlKFxuICAgIFRNQl9ncm91cCA9IGlmZWxzZShUTUJfYWxsID49IG1lZGlhbihUTUJfYWxsLCBuYS5ybSA9IFRSVUUpLCBcIkhpZ2hcIiwgXCJMb3dcIiksXG4gICAgbnNfZ3JvdXAgID0gaWZlbHNlKG5zU05WX2FsbCA+PSBtZWRpYW4obnNTTlZfYWxsLCBuYS5ybSA9IFRSVUUpLCBcIkhpZ2hcIiwgXCJMb3dcIilcbiAgKVxuXG4jIEtNOiBUTUJcbmZpdF90bWIgPC0gc3VydmZpdChTdXJ2KE9TX3RpbWUsIE9TX2V2ZW50KSB+IFRNQl9ncm91cCwgZGF0YSA9IGRma20pXG5nZ3N1cnZwbG90KGZpdF90bWIsIGRhdGEgPSBkZmttLCBwdmFsID0gVFJVRSwgcmlzay50YWJsZSA9IFRSVUUpXG5cbiMgS006IG5zU05WIGNvdW50XG5maXRfbnMgPC0gc3VydmZpdChTdXJ2KE9TX3RpbWUsIE9TX2V2ZW50KSB+IG5zX2dyb3VwLCBkYXRhID0gZGZrbSlcbmdnc3VydnBsb3QoZml0X25zLCBkYXRhID0gZGZrbSwgcHZhbCA9IFRSVUUsIHJpc2sudGFibGUgPSBUUlVFKVxuYGBgIn0= -->
+
+```r
+library(survival)
+# install.packages(\"survminer\") if needed
+library(survminer)
+
+dfkm <- dfp %>% filter(!is.na(OS_event))
+
+dfkm <- dfkm %>%
+  mutate(
+    TMB_group = ifelse(TMB_all >= median(TMB_all, na.rm = TRUE), \"High\", \"Low\"),
+    ns_group  = ifelse(nsSNV_all >= median(nsSNV_all, na.rm = TRUE), \"High\", \"Low\")
+  )
+
+# KM: TMB
+fit_tmb <- survfit(Surv(OS_time, OS_event) ~ TMB_group, data = dfkm)
+ggsurvplot(fit_tmb, data = dfkm, pval = TRUE, risk.table = TRUE)
+
+# KM: nsSNV count
+fit_ns <- survfit(Surv(OS_time, OS_event) ~ ns_group, data = dfkm)
+ggsurvplot(fit_ns, data = dfkm, pval = TRUE, risk.table = TRUE)
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+library(survival)
+# install.packages(\"survminer\") if needed
+library(survminer)
+
+dfkm <- dfp %>% filter(!is.na(OS_event))
+
+dfkm <- dfkm %>%
+  mutate(
+    TMB_group = ifelse(TMB_all >= median(TMB_all, na.rm = TRUE), \"High\", \"Low\"),
+    ns_group  = ifelse(nsSNV_all >= median(nsSNV_all, na.rm = TRUE), \"High\", \"Low\")
+  )
+
+# KM: TMB
+fit_tmb <- survfit(Surv(OS_time, OS_event) ~ TMB_group, data = dfkm)
+ggsurvplot(fit_tmb, data = dfkm, pval = TRUE, risk.table = TRUE)
+
+# KM: nsSNV count
+fit_ns <- survfit(Surv(OS_time, OS_event) ~ ns_group, data = dfkm)
+ggsurvplot(fit_ns, data = dfkm, pval = TRUE, risk.table = TRUE)
+```"

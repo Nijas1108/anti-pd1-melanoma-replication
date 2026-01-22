@@ -1,0 +1,8 @@
+"0","# ---- Read clinical data ----"
+"0","clinical_df <- read.csv(""../mmc1.csv"", stringsAsFactors = FALSE)"
+"0",""
+"0","# RENAME the ID column to match the MAF requirement"
+"0","# Check your CSV; if the column is 'Sample.ID', use that name here:"
+"0","colnames(clinical_df)[colnames(clinical_df) == ""SRA.Run.ID..tumor.WES""] <- ""Tumor_Sample_Barcode"""
+"0","colnames(clinical_df)[colnames(clinical_df) == ""SRA.Run.ID..normal.WES""] <- ""Matched_Norm_Sample_Barcode"""
+"0",""

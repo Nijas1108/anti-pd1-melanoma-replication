@@ -1,0 +1,39 @@
+# --- BIG / SENSITIVE: do not commit ---
+data/
+processed_data/
+reference_genome/
+
+# genomics file types
+*.fastq.gz
+*.fq.gz
+*.sra
+*.bam
+*.bai
+*.cram
+*.crai
+*.vcf.gz
+*.tbi
+*.maf
+*.tar.gz
+
+# typical workflow outputs
+results/
+logs/
+tmp/
+work/
+.nextflow*
+.nf-work/
+
+# notebooks + R/Python clutter
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.Rhistory
+.RData
+*.rds
+
+# large / binary analysis artifacts (keep only if truly small)
+*.hdf5
+*.h5
+*.h5ad
+

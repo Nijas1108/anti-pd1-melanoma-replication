@@ -1,0 +1,89 @@
+---
+title: "aish_analysis"
+output: html_document
+date: "2026-01-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## LOADING LIBRARIES: 
+```{r}
+library(maftools)
+library(dplyr)
+library(ggplot2)
+```
+## LOAD IN MMC1 METADATA:
+```{r}
+# Read clinical metadata into a datafram
+clinical_df_og <- read.csv("mmc1.csv", stringsAsFactors = FALSE)
+
+# Rename the sample ID column to match the MAF sample ID column (Sample_Barcode)
+# Check CSV and use the name of the column here:
+colnames(clinical_df_og)[colnames(clinical_df_og) == "SRA.Run.ID..tumor.WES"] <- "Tumor_Sample_Barcode"
+colnames(clinical_df_og)[colnames(clinical_df_og) == "SRA.Run.ID..normal.WES"] <- "Matched_Norm_Sample_Barcode"
+```
+
+## LOADING IN MAF FILES: 
+```{r}
+# 1. Define the two directories
+ucla_dir <- "/rds/projects/e/elhamsak-group5/main_project/annotation/ucla_processed_bed"
+vandy_dir <- "/rds/projects/e/elhamsak-group5/main_project/annotation/vanderbilt_processed_bed" 
+
+# Collect all MAF files
+maf_files <- c(
+  list.files(ucla_dir,  pattern = "\\.maf$", full.names = TRUE),
+  list.files(vandy_dir, pattern = "\\.maf$", full.names = TRUE)
+)
+
+cat("Total MAF files found:", length(maf_files), "\n")
+```
+
+## COMBINING ALL MAFS
+```{r}
+# Process each MAF
+all_mafs_list <- lapply(maf_files, function(file_path) {
+  
+  dat <- read.delim(file_path, comment.char = "#", stringsAsFactors = FALSE)
+  
+  # Replacing UNKNOWN in Sample_Barcode with Run ID
+  fname <- basename(file_path) # Extract both IDs from filename
+  # removes everything starting from the first dot and split by "_vs_"
+  ids <- unlist(strsplit(clean_name <- gsub("\\..*", "", fname), "_vs_"))
+  
+  tumor_id  <- ids[1]
+  normal_id <- ids[2]
+  
+  # Replace BOTH barcodes
+  dat$Tumor_Sample_Barcode  <- tumor_id
+  dat$Matched_Norm_Sample_Barcode <- normal_id
+  
+  # Track cohort source
+  dat$Cohort <- ifelse(grepl("UCLA", file_path),
+                       "UCLA",
+                       "VANDERBILT")
+  return(dat)
+})
+
+# Combine all MAFs
+combined_df <- do.call(rbind, all_mafs_list)
+cat("Total variants after merge:", nrow(combined_df), "\n")
+```
+
+## MERGING MMC1 METADATA WITH combined_df: 
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,136 @@
+#!/bin/bash
+#SBATCH --job-name=mutect2_ucla_refined
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --time=48:00:00
+#SBATCH --array=0-29
+#SBATCH --output=logs/%x_%A_%a.out
+#SBATCH --error=logs/%x_%A_%a.err
+
+set -euo pipefail
+
+# -------------------------------
+# Load Environment
+# -------------------------------
+module purge
+module load bluebear
+module load bear-apps/2022b
+module load GATK/4.4.0.0-GCCcore-12.2.0-Java-17
+module load SAMtools/1.17-GCC-12.2.0
+module load BCFtools/1.17-GCC-12.2.0
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-1} # ensures that GATK uses the requested threads
+
+mkdir -p logs
+
+# -------------------------------
+# Inputs & Paths (Code 2 Parameters)
+# -------------------------------
+REF=/rds/projects/e/elhamsak-group5/main_project/reference_genome/hg38.fa
+GNOMAD=/rds/projects/e/elhamsak-group5/main_project/reference_genome/gnomAD/af-only-gnomad.hg38.nochr.vcf.gz
+COMMON=/rds/projects/e/elhamsak-group5/main_project/reference_genome/gnomAD/small_exac_common_3.hg38.nochr.vcf.gz
+BED=/rds/projects/e/elhamsak-group5/main_project/reference_genome/Twist_Exome_Core_hg38_padded.bed
+
+ALIGN_DIR=/rds/projects/e/elhamsak-group5/main_project/aligned_files/UCLA_samples
+OUT_BASE=/rds/projects/e/elhamsak-group5/main_project/variant_calling/ucla_processed_bed
+
+# -------------------------------
+# Full Pair List
+# -------------------------------
+TUMORS=(
+SRR3083866 SRR3083839 SRR3083841 SRR3083837 SRR3083857 SRR3083863 SRR3083870 SRR4289715 SRR3083849 SRR4289717
+SRR4289719 SRR3083882 SRR3083855 SRR3083868 SRR3083845 SRR4289721 SRR4289723 SRR3083859 SRR3083847 SRR3083872
+SRR3083861 SRR3083878 SRR3083874 SRR3083853 SRR3083880 SRR3083843 SRR4289725 SRR4289726 SRR3083851 SRR3083876
+)
+
+NORMALS=(
+SRR3083867 SRR3083840 SRR3083842 SRR3083838 SRR3083858 SRR3083864 SRR3083871 SRR4289714 SRR3083850 SRR4289716
+SRR4289718 SRR3083883 SRR3083856 SRR3083869 SRR3083846 SRR4289720 SRR4289722 SRR3083860 SRR3083848 SRR3083873
+SRR3083862 SRR3083879 SRR3083875 SRR3083854 SRR3083881 SRR3083844 SRR4289724 SRR4289724 SRR3083852 SRR3083877
+)
+
+
+TUMOR=${TUMORS[$SLURM_ARRAY_TASK_ID]}
+NORMAL=${NORMALS[$SLURM_ARRAY_TASK_ID]}
+
+# Define paths FIRST
+TUMOR_BAM=${ALIGN_DIR}/${TUMOR}.sorted.bam
+NORMAL_BAM=${ALIGN_DIR}/${NORMAL}.sorted.bam
+
+# Then check if they exist (using the correct variable name: TUMOR_BAM)
+[[ -f "$TUMOR_BAM" ]] || { echo "Missing tumor BAM: $TUMOR_BAM"; exit 1; }
+[[ -f "$NORMAL_BAM" ]] || { echo "Missing normal BAM: $NORMAL_BAM"; exit 1; }
+echo "Tumor: $TUMOR"
+echo "Normal: $NORMAL"
+
+
+# Workspace setup
+OUTDIR=${OUT_BASE}/${TUMOR}_vs_${NORMAL}
+mkdir -p "$OUTDIR"
+cd "$OUTDIR"
+
+# -------------------------------
+# Step 1: Mutect2
+# -------------------------------
+if [[ ! -f unfiltered.vcf.gz ]]; then
+  echo "Running Mutect2 for $TUMOR..."
+  gatk --java-options "-Xmx48G" Mutect2 \
+    -R "$REF" \
+    -I "$TUMOR_BAM" -tumor "$TUMOR" \
+    -I "$NORMAL_BAM" -normal "$NORMAL" \
+    -L "$BED" \
+    --germline-resource "$GNOMAD" \
+    --f1r2-tar-gz f1r2.tar.gz \
+    --native-pair-hmm-threads "$SLURM_CPUS_PER_TASK" \
+    -O unfiltered.vcf.gz
+fi
+
+# -------------------------------
+# Step 2: Orientation Bias
+# -------------------------------
+if [[ ! -f read-orientation-model.tar.gz ]]; then
+  gatk LearnReadOrientationModel -I f1r2.tar.gz -O read-orientation-model.tar.gz
+fi
+
+# -------------------------------
+# Step 3: Matched Pileups (Scientific Improvement)
+# -------------------------------
+if [[ ! -f normal_pileups.table ]]; then
+  gatk GetPileupSummaries -I "$NORMAL_BAM" -V "$COMMON" -L "$BED" -O normal_pileups.table
+fi
+
+if [[ ! -f tumor_pileups.table ]]; then
+  gatk GetPileupSummaries -I "$TUMOR_BAM" -V "$COMMON" -L "$BED" -O tumor_pileups.table
+fi
+
+if [[ ! -f contamination.table ]]; then
+  gatk CalculateContamination \
+    -I tumor_pileups.table \
+    -matched normal_pileups.table \
+    -O contamination.table \
+    --tumor-segmentation segments.table
+fi
+
+# -------------------------------
+# Step 4: Filter and PASS
+# -------------------------------
+if [[ ! -f filtered.vcf.gz ]]; then
+  gatk FilterMutectCalls \
+    -R "$REF" \
+    -V unfiltered.vcf.gz \
+    --contamination-table contamination.table \
+    --tumor-segmentation segments.table \
+    --ob-priors read-orientation-model.tar.gz \
+    -L "$BED" \
+    -O filtered.vcf.gz
+fi
+
+# -------------------------------
+# Step 5: Index filtered vcf
+# -------------------------------
+if [[ ! -f filtered.PASS.vcf.gz ]]; then
+  bcftools view -f PASS filtered.vcf.gz -Oz -o filtered.PASS.vcf.gz
+  bcftools index -t filtered.PASS.vcf.gz
+fi
+
+echo "Processing complete for ${TUMOR}_vs_${NORMAL}"

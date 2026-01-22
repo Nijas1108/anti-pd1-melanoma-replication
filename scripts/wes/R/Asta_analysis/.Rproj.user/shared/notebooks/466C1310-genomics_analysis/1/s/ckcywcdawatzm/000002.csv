@@ -1,0 +1,40 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShkcGx5cilcbm5zX2NsYXNzZXMgPC0gYyhcbiAgXCJNaXNzZW5zZV9NdXRhdGlvblwiLFxuICBcIk5vbnNlbnNlX011dGF0aW9uXCIsXG4gIFwiTm9uc3RvcF9NdXRhdGlvblwiLFxuICBcIlNwbGljZV9TaXRlXCIsXG4gIFwiVHJhbnNsYXRpb25fU3RhcnRfU2l0ZVwiXG4pXG5cbm5vbnNpbGVudF9jbGFzc2VzIDwtIGMoXG4gIG5zX2NsYXNzZXMsXG4gIFwiRnJhbWVfU2hpZnRfRGVsXCIsIFwiRnJhbWVfU2hpZnRfSW5zXCIsXG4gIFwiSW5fRnJhbWVfRGVsXCIsIFwiSW5fRnJhbWVfSW5zXCJcbilcblxuYGBgIn0= -->
+
+```r
+library(dplyr)
+ns_classes <- c(
+  \"Missense_Mutation\",
+  \"Nonsense_Mutation\",
+  \"Nonstop_Mutation\",
+  \"Splice_Site\",
+  \"Translation_Start_Site\"
+)
+
+nonsilent_classes <- c(
+  ns_classes,
+  \"Frame_Shift_Del\", \"Frame_Shift_Ins\",
+  \"In_Frame_Del\", \"In_Frame_Ins\"
+)
+
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+library(dplyr)
+ns_classes <- c(
+  \"Missense_Mutation\",
+  \"Nonsense_Mutation\",
+  \"Nonstop_Mutation\",
+  \"Splice_Site\",
+  \"Translation_Start_Site\"
+)
+
+nonsilent_classes <- c(
+  ns_classes,
+  \"Frame_Shift_Del\", \"Frame_Shift_Ins\",
+  \"In_Frame_Del\", \"In_Frame_Ins\"
+)
+
+```"

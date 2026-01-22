@@ -1,0 +1,42 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuaW5zdGFsbC5wYWNrYWdlcyhcIkJpb2NNYW5hZ2VyXCIpXG5gYGAifQ== -->
+
+```r
+install.packages(\"BiocManager\")
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+install.packages(\"BiocManager\")
+```"
+"1","trying URL 'https://cran.rstudio.com/src/contrib/BiocManager_1.30.27.tar.gz'
+Content type 'application/x-gzip' length 752490 bytes (734 KB)
+==================================================
+downloaded 734 KB
+
+
+The downloaded source packages are in
+	‘/tmp/Rtmp2gJ9fX/downloaded_packages’
+"
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuQmlvY01hbmFnZXI6Omluc3RhbGwoXCJtYWZ0b29sc1wiKVxuYGBgIn0= -->
+
+```r
+BiocManager::install(\"maftools\")
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+BiocManager::install(\"maftools\")
+```"
+"1","trying URL 'https://bioconductor.org/packages/3.21/bioc/src/contrib/maftools_2.24.0.tar.gz'
+Content type 'application/gzip' length 12468266 bytes (11.9 MB)
+==================================================
+downloaded 11.9 MB
+
+
+The downloaded source packages are in
+	‘/tmp/Rtmp2gJ9fX/downloaded_packages’
+"

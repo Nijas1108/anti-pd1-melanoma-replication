@@ -1,0 +1,258 @@
+---
+title: "MOFA"
+output: html_notebook
+---
+
+```{r}
+library(maftools)
+maf <- readRDS("merged_maf.rds") 
+```
+
+```{r}
+gene_sample_counts <- maf@data |>
+  dplyr::select(Hugo_Symbol, Tumor_Sample_Barcode) |>
+  dplyr::distinct() |>
+  dplyr::count(Hugo_Symbol, name = "n_samples_mutated") |>
+  dplyr::arrange(desc(n_samples_mutated))
+
+head(gene_sample_counts, 20)
+table(gene_sample_counts$n_samples_mutated)
+
+genes_keep <- gene_sample_counts |>
+  dplyr::filter(n_samples_mutated >= 5) |>
+  dplyr::pull(Hugo_Symbol)
+
+gene_sample_counts_filt <- gene_sample_counts |>
+  dplyr::filter(n_samples_mutated >= 5)
+
+maf_filt <- subsetMaf(maf, genes = genes_keep, mafObj = TRUE)
+
+# # 1. Run oncoplot but tell it to write the matrix to a file
+# # This will create a file named 'onco_matrix.txt' in your working directory
+# oncoplot(maf = maf_filt, genes = genes_keep, writeMatrix = TRUE)
+# 
+# # 2. Read that matrix back into R
+# # This matrix will have genes as rows, samples as columns, and mutation types as strings
+# onco_mat_raw <- read.table("onco_matrix.txt", sep = "\t", header = TRUE, check.names = FALSE, row.names = 1)
+# 
+# # 3. Convert to 0/1 (binary) matrix
+# # If the cell is empty (or ""), it's 0 (no mutation); otherwise, it's 1
+# mut_mat <- ifelse(onco_mat_raw == "" | is.na(onco_mat_raw), 0, 1)
+
+mut_mat <- readRDS("mutation_matrix_for_mofa.rds")
+# Verify the result
+print(mut_mat[1:5, 1:5])
+```
+
+```{r}
+# Statistical test for somatic interactions
+# somatic_interactions <- somaticInteractions(maf = maf_filt, genes = genes_keep, pvalue = c(0.05, 0.1))
+
+# This will generate a heatmap showing which gene pairs are significant
+```
+
+
+```{r}
+# # Example: Adding clinical data to the plot
+# oncoplot(maf = maf_filt, 
+#          genes = genes_keep, 
+#          clinicalFeatures = c("Tumor_Stage", "Gender"), # Change these to match your metadata columns
+#          sortByAnnotation = TRUE, 
+#          removeNonMutated = TRUE)
+```
+
+
+```{r}
+library(pheatmap)
+
+# Cluster samples (columns) and genes (rows)
+pheatmap(mut_mat, 
+         clustering_distance_rows = "binary", 
+         clustering_distance_cols = "binary", 
+         color = c("white", "firebrick"), 
+         show_colnames = FALSE,
+         main = "Patient Mutation Clusters")
+```
+
+
+
+## ALIGNING DATASETS
+```{r}
+# Load the datasets
+ipres_df <- read.csv("IPRES_scores.csv", row.names = 1) 
+rna_df   <- read.csv("normalized_counts_DESeq2.csv", row.names = 1)
+
+# Check: In MOFA, features (genes/signatures) should be rows and samples should be columns.
+# If your samples are currently rows, transpose them:
+ipres_df <- t(ipres_df)
+# rna_df   <- t(rna_df)
+```
+
+## ALIGNING DATASETS
+```{r}
+# Extract clinical data from the MAF object
+maf_metadata <- getClinicalData(merged_maf)
+
+# Create the lookup: lookup["SRR_RNA_ID"] -> "Tumor_Sample_Barcode"
+# Note: Check if the column is 'SRA.Run.ID..tumor.WES' or 'SRA.Run.ID..tumor.RNA' 
+# based on your mmc1.csv structure.
+id_lookup <- setNames(maf_metadata$Tumor_Sample_Barcode, 
+                      maf_metadata$SRA.Run.ID..tumor.RNA)
+```
+
+```{r}
+# 1. Create the lookup, removing NAs from the metadata first
+valid_metadata <- maf_metadata[!is.na(maf_metadata$SRA.Run.ID..tumor.RNA), ]
+id_lookup <- setNames(valid_metadata$Tumor_Sample_Barcode, 
+                      valid_metadata$SRA.Run.ID..tumor.RNA)
+
+# 2. Rename RNA-seq Data
+# Find which columns in rna_df actually exist in our lookup
+rna_matches <- intersect(colnames(rna_df), names(id_lookup))
+rna_df_matched <- rna_df[, rna_matches, drop = FALSE]
+colnames(rna_df_matched) <- id_lookup[rna_matches]
+
+# 3. Rename IPRES Data
+# Find which columns in ipres_df actually exist in our lookup
+ipres_matches <- intersect(colnames(ipres_df), names(id_lookup))
+ipres_df_matched <- ipres_df[, ipres_matches, drop = FALSE]
+colnames(ipres_df_matched) <- id_lookup[ipres_matches]
+
+# 4. Final Intersection across ALL 3 Views
+# mut_matrix uses Tumor_Sample_Barcode already
+common_samples <- intersect(colnames(mut_mat), 
+                            intersect(colnames(rna_df_matched), 
+                                      colnames(ipres_df_matched)))
+
+cat("Final count of samples present in Mutations, RNA, and IPRES:", length(common_samples), "\n")
+```
+
+
+
+
+
+```{r}
+# 4. Final View Preparation
+# Subset all views to the 'common_samples'
+mut_view   <- as.matrix(mut_mat[, common_samples, drop = FALSE])
+rna_view   <- as.matrix(rna_df_matched[, common_samples, drop = FALSE])
+ipres_view <- as.matrix(ipres_df_matched[, common_samples, drop = FALSE])
+
+# Filter RNA-seq for high variance (Top 2000 genes)
+# This is standard to remove 'housekeeping' genes that don't vary between patients
+rv <- apply(rna_view, 1, var)
+variant_genes <- names(sort(rv, decreasing = TRUE))[1:min(2000, length(rv))]
+rna_view_filtered <- rna_view[variant_genes, ]
+```
+
+
+```{r}
+library(MOFA2)
+
+# 1. Prepare the list of views
+data_list <- list(
+  Mutations = mut_view,
+  RNAseq = rna_view_filtered,
+  IPRES = ipres_view
+)
+
+# 2. Create the MOFA object
+MOFAobject <- create_mofa(data_list)
+
+# 3. Define data options (likelihoods)
+data_opts <- get_default_data_options(MOFAobject)
+# Mutations are binary (Bernoulli), others are continuous (Gaussian)
+# MOFA usually detects this, but you can check:
+# print(MOFAobject@model_options$likelihoods)
+
+# 4. Define model and training options
+model_opts <- get_default_model_options(MOFAobject)
+model_opts$num_factors <- 10  # Standard starting point
+
+train_opts <- get_default_training_options(MOFAobject)
+train_opts$convergence_mode <- "medium" # Use "slow" for publication quality
+
+# 5. Prepare and Run
+MOFAobject <- prepare_mofa(MOFAobject, 
+                           data_options = data_opts,
+                           model_options = model_opts, 
+                           training_options = train_opts)
+
+MOFA_result <- run_mofa(MOFAobject, outfile = "Melanoma_MOFA_Result.hdf5", use_basilisk = TRUE)
+
+```
+
+
+Visualize the Variance Explained
+Now that MOFA_result exists, the first thing you should do is see how much each view (Mutations, RNA, IPRES) contributes to the factors.
+```{r}
+# 1. Save Total Variance Plot
+pdf("MOFA_Total_Variance.pdf", width = 7, height = 5)
+  plot_variance_explained(MOFA_result, plot_total = TRUE)
+dev.off()
+
+# 2. Save Factor-specific Variance Plot
+pdf("MOFA_Factor_Variance.pdf", width = 8, height = 6)
+  plot_variance_explained(MOFA_result, x="view", y="factor")
+dev.off()
+```
+
+Check the "Top Weights" for Factor 1 and 2
+If Factor 1 or 2 explains a lot of variance in both Mutations and IPRES, those are your "Biomarker" factors. Let's see which genes/signatures are driving them:
+```{r}
+# Top genes/signatures for Factor 1
+pdf("Top_genes_factor1.pdf", width = 8, height = 6)
+plot_top_weights(MOFA_result, view = "RNAseq", factor = 1, nfeatures = 10)
+dev.off()
+
+pdf("Top_genes_factor2.pdf", width = 8, height = 6)
+plot_top_weights(MOFA_result, view = "IPRES", factor = 1, nfeatures = 10)
+dev.off()
+```
+
+Link MOFA to your Clinical Response
+This is the "aha!" moment for your paper. We need to see if the patients who responded to treatment have higher scores in a specific Factor.
+```{r}
+Z <- get_factors(MOFA_result, factors = "all")
+Z_mat <- Z$samples[[1]]
+rownames(Z_mat)
+
+
+mofa_metadata <- maf_metadata %>% 
+  filter(Tumor_Sample_Barcode %in% common_samples) %>%
+  mutate(
+    sample = Tumor_Sample_Barcode,
+    Response = case_when(
+      irRECIST %in% c("Complete Response", "Partial Response") ~ "Responding",
+      irRECIST == "Progressive Disease" ~ "Non-responding",
+      TRUE ~ "Other"
+    )
+  )
+
+samples_metadata(MOFA_result) <- mofa_metadata
+
+# Plot Factor scores colored by Response
+pdf("mofa_link_clinical_response.pdf", width = 8, height = 6)
+plot_factor(MOFA_result, 
+            factors = 1:3, 
+            color_by = "Response", 
+            add_violin = TRUE)
+dev.off()
+```
+Link MOFA to your SURVIVAL
+
+
+```{r}
+# Update metadata with survival info
+mofa_metadata <- maf_metadata %>% 
+  filter(Tumor_Sample_Barcode %in% common_samples) %>%
+  mutate(
+    sample = Tumor_Sample_Barcode,
+    # Survival Time (must be numeric)
+    time = as.numeric(OS_months), 
+    # Status (1 for event, 0 for censored)
+    status = as.numeric(Death_event) 
+  )
+
+samples_metadata(MOFA_result) <- mofa_metadata
+```

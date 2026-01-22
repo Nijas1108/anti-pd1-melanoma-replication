@@ -1,0 +1,723 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#Librarys
+library(maftools)
+library(dplyr)
+library(ggplot2)
+library(survival)
+library(tidyr)
+```
+
+```{r}
+#contains all VCF data
+merged_maf <- readRDS("/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/merged_maf.rds") 
+# has patient.id and tumor_sample_barcode, survival, resposne etc
+clinical_df_og <-read.csv("/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/mmc1.csv", stringsAsFactors = FALSE)
+# has paper SNV counts for validation
+author_data <- read.csv("/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/Snv_counts.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+#Rename colums in clinicaldf
+clinical_df_og <- clinical_df_og %>%
+  rename(
+    "Tumor_Sample_Barcode" = "SRA.Run.ID..tumor.WES",
+    "Matched_Norm_Sample_Barcode" = "SRA.Run.ID..normal.WES"
+  )
+```
+
+```{r}
+## CALCULATING NUMBER OF NON-SYNONYMOUS MUTATIONS:
+nsSNV_classes <- c(
+  "Missense_Mutation", "Nonsense_Mutation",
+  "Nonstop_Mutation", "Splice_Site",
+  "Translation_Start_Site"
+)
+
+ns_nonsilent_classes <- c(
+  nsSNV_classes,
+  "Frame_Shift_Del", "Frame_Shift_Ins",
+  "In_Frame_Del", "In_Frame_Ins"
+)
+
+# Calculating only SNV counts
+nsSNV_counts <- merged_maf@data %>%
+  filter(Variant_Type == "SNP", 
+         Variant_Classification %in% nsSNV_classes) %>%
+  count(Tumor_Sample_Barcode, name = "nsSNV")
+
+# Calculating all non-silent variants
+non_silent_counts <- merged_maf@data %>%
+  filter(Variant_Classification %in% ns_nonsilent_classes) %>%
+  count(Tumor_Sample_Barcode, name = "all_nonsilent_vars")
+
+# Map Patient.ID to Tumor_Sample_Barcode using your clinical metadata
+author_data_mapped <- author_data %>%
+  left_join(
+    clinical_df_og %>% select(Tumor_Sample_Barcode, Patient.ID),
+    by = "Patient.ID"
+  ) %>%
+  # Keep only columns we need for TMB calculation and plotting
+  select(Tumor_Sample_Barcode, TotalNonSyn, TotalNonSyn_Exp)
+```
+
+```{r}
+#Create df with TMB
+# 1. Load callable base summary
+# Format: Tumor_Sample_Barcode, Matched_Norm_Sample_Barcode, Total_Bases, Total_MB
+tmb_df <- read.delim("/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/aish_analysis/all_samples_callable_bases.txt",
+                          header = FALSE, stringsAsFactors = FALSE)
+colnames(tmb_df) <- c("Tumor_Sample_Barcode", "Matched_Norm_Sample_Barcode", "Total_Bases", "Callable_Mb")
+
+# filter out low coverage samples
+min_callable_mb <- 50
+tmb_df <- tmb_df %>% filter(Callable_Mb >= min_callable_mb)
+
+# 2. Merge nsSNV and non-silent variant counts
+tmb_df <- tmb_df %>%
+  left_join(nsSNV_counts, by = "Tumor_Sample_Barcode") %>%
+  left_join(non_silent_counts, by = "Tumor_Sample_Barcode")
+
+# 3. Merge author data
+tmb_df <- tmb_df %>%
+  left_join(author_data_mapped, by = "Tumor_Sample_Barcode")
+
+# 4. Calculate TMB
+# TMB = nsSNV / Callable Mb
+tmb_df <- tmb_df %>%
+  mutate(TMB = nsSNV / Callable_Mb)
+
+# 5. Rearrange columns
+tmb_df <- tmb_df %>%
+  select(
+    Tumor_Sample_Barcode,
+    Matched_Norm_Sample_Barcode,
+    nsSNV,
+    all_nonsilent_vars,
+    TotalNonSyn,
+    TotalNonSyn_Exp,
+    Total_Bases,
+    Callable_Mb,
+    TMB
+  )
+
+# 6. Inspect
+head(tmb_df)
+```
+
+
+```{r}
+#create Plottingdf
+# Clinical Data 
+plotting_df <- getClinicalData(merged_maf) %>%
+  select(Patient.ID, Tumor_Sample_Barcode, Matched_Norm_Sample_Barcode,
+         irRECIST, Overall.Survival, Vital.Status)
+
+# 2. Join the SNV counts
+plotting_df <- plotting_df %>%
+  left_join(nsSNV_counts, by = "Tumor_Sample_Barcode")
+
+# 3. Join the All Non-Silent counts
+plotting_df <- plotting_df %>%
+  left_join(non_silent_counts, by = "Tumor_Sample_Barcode")
+
+# 4. Join the Author Data for validation
+plotting_df <- plotting_df %>%
+  left_join(author_data, by = "Patient.ID")
+
+# 5. Handle NAs 
+plotting_df[is.na(plotting_df)] <- 0
+
+
+```
+
+```{r}
+#make one clean df with TMB
+final_plotting_df <- plotting_df %>%
+  left_join(
+    tmb_df,
+    by = c("Tumor_Sample_Barcode", "Matched_Norm_Sample_Barcode"),
+    suffix = c("", "_tmb")
+  ) %>%
+  select(
+    Patient.ID,
+    Tumor_Sample_Barcode,
+    Matched_Norm_Sample_Barcode,
+    irRECIST,
+    Overall.Survival,
+    Vital.Status,
+    nsSNV,                
+    all_nonsilent_vars,   
+    BRCA2mutant.,
+    Response,
+    TotalNonSyn,
+    TotalNonSyn_Exp,
+    Total_Bases,
+    Callable_Mb,
+    TMB
+  )
+
+final_plotting_df <- final_plotting_df %>%
+  mutate(
+    resp_group = case_when(
+      irRECIST %in% c("Complete Response", "Partial Response") ~ "Responding",
+      irRECIST == "Progressive Disease" ~ "Non-responding",
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+For vlabs 
+```{r, fig.width=5, fig.height=5,echo=FALSE}
+#Check correlation with author counts
+# remove zeros for log scale safety
+df_cor <- final_plotting_df %>%
+  filter(nsSNV > 0, TotalNonSyn > 0)
+
+# Spearman correlation
+cor_test <- cor.test(
+  df_cor$nsSNV,
+  df_cor$TotalNonSyn,
+  method = "spearman"
+)
+
+cor_test
+p1 <- plot(
+  final_plotting_df$nsSNV, final_plotting_df$TotalNonSyn,
+  log = "xy",
+  xlab = "Reproduced Calculation(log10)",
+  ylab = "Author Calculation (log10)",
+  main = "Validation of SNV Counts",
+  asp = 1
+)
+abline(0, 1, col = "red")
+
+rho <- round(cor_test$estimate, 2)
+p   <- cor_test$p.value
+
+text(
+  x = 70,
+  y = 3000,
+  labels = paste0("Spearman \u03c1 = ", rho,
+                  "\n p = ", format.pval(p, digits = 2, eps = 1e-16)),
+  adj = 0,
+  cex = 0.6
+)
+ggsave("reproduced_vs_author_counts.png", plot = p1, width = 6, height = 4, dpi = 300)
+```
+For bear cluster
+```{r}
+df_cor <- final_plotting_df %>%
+  dplyr::filter(nsSNV > 0, TotalNonSyn > 0)
+
+cor_test <- cor.test(df_cor$nsSNV, df_cor$TotalNonSyn, method = "spearman")
+print(cor_test)
+
+rho <- round(unname(cor_test$estimate), 2)
+p   <- cor_test$p.value
+
+# headless-safe PNG
+ragg::agg_png("reproduced_vs_author_counts.png",
+              width = 6, height = 4, units = "in", res = 300)
+
+plot(
+  df_cor$nsSNV, df_cor$TotalNonSyn,
+  log = "xy",
+  xlab = "Reproduced Calculation (log10)",
+  ylab = "Author Calculation (log10)",
+  main = "Validation of SNV Counts",
+  asp = 1
+)
+
+abline(0, 1, col = "red")
+
+legend(
+  "topleft",
+  bty = "n",
+  cex = 0.7,
+  legend = paste0(
+    "Spearman \u03c1 = ", rho,
+    "\n p = ", format.pval(p, digits = 2, eps = 1e-16)
+  )
+)
+
+dev.off()
+```
+
+TMB vs snSNV
+```{r, fig.width=5, fig.height=5}
+# remove zeros for log scale safety
+df_cor <- final_plotting_df %>%
+  filter(nsSNV > 0, TMB > 0)
+
+# Spearman correlation
+cor_test <- cor.test(df_cor$nsSNV, df_cor$TMB, method = "spearman")
+print(cor_test)
+
+rho <- round(unname(cor_test$estimate), 2)
+p   <- cor_test$p.value
+
+# open headless-safe device
+ragg::agg_png(
+  "nsSNV_vs_TMB.png",
+  width = 5, height = 5, units = "in", res = 300
+)
+
+plot(
+  df_cor$nsSNV, df_cor$TMB,
+  log = "xy",
+  xlab = "nsSNV (log10)",
+  ylab = "TMB (log10)",
+  main = "SNV Counts vs TMB",
+  asp = 1
+)
+
+
+legend(
+  "topleft",
+  bty = "n",
+  cex = 0.7,
+  legend = paste0(
+    "Spearman \u03c1 = ", rho,
+    "\n p = ", format.pval(p, digits = 2, eps = 1e-16)
+  )
+)
+
+dev.off()
+
+```
+For the kaplan meyer plot A
+```{r, fig.width=5, fig.height=5}
+km_df <- final_plotting_df %>%
+  mutate(
+    Vital.Status = tolower(trimws(as.character(Vital.Status))),
+    Overall.Survival = as.numeric(Overall.Survival),
+    time_years = Overall.Survival / 365.25,
+    event = ifelse(Vital.Status == "dead", 1,
+                   ifelse(Vital.Status == "alive", 0, NA))
+  ) %>%
+  filter(!is.na(time_years), !is.na(event), !is.na(nsSNV)) %>%
+  filter(Patient.ID != "Pt8")
+
+# tertiles on nsSNV, keep top vs bottom
+q <- quantile(km_df$nsSNV, probs = c(1/3, 2/3), na.rm = TRUE)
+km_df <- km_df %>%
+  mutate(group = case_when(
+    nsSNV <= q[1] ~ "Bottom third",
+    nsSNV >= q[2] ~ "Top third",
+    TRUE ~ "Middle third"
+  )) %>%
+  filter(group %in% c("Top third", "Bottom third")) %>%
+  mutate(group = factor(group, levels = c("Top third", "Bottom third")))
+
+fit  <- survfit(Surv(time_years, event) ~ group, data = km_df)
+sd   <- survdiff(Surv(time_years, event) ~ group, data = km_df)
+pval <- 1 - pchisq(sd$chisq, df = 1)
+
+# Save (headless-safe)
+ragg::agg_png("figure_A_rep.png", width = 6, height = 5, units = "in", res = 300)
+
+plot(
+  fit,
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  mark.time = TRUE,
+  mark = 3,
+  xlab = "Survival (years)",
+  ylab = "Fraction surviving",
+  xlim = c(0, 6),
+  ylim = c(0, 1)
+)
+
+legend(
+  "topright",
+  title = "nsSNV count",
+  legend = c("Top third", "Bottom third"),
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  bty = "n"
+)
+
+
+usr <- par("usr")  # c(xmin, xmax, ymin, ymax)
+text(
+  x = usr[1] + 0.75 * (usr[2] - usr[1]),
+  y = usr[3] + 0.20 * (usr[4] - usr[3]),
+  labels = paste0("p = ", format.pval(pval, digits = 3, eps = 0.001))
+)
+
+dev.off()
+```
+Figure B
+```{r, fig.width=5, fig.height=5}
+kmB_df <- final_plotting_df %>%
+  mutate(
+    Overall.Survival = as.numeric(Overall.Survival),
+    time_years = Overall.Survival / 365.25,
+
+    Vital.Status = tolower(trimws(as.character(Vital.Status))),
+    event = case_when(
+      Vital.Status == "dead"  ~ 1,
+      Vital.Status == "alive" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    Response = trimws(as.character(Response)),
+    resp_group = case_when(
+      Response == "R"  ~ "Responding",
+      Response == "NR" ~ "Non-responding",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(time_years), !is.na(event), !is.na(resp_group)) %>%
+  mutate(resp_group = factor(resp_group, levels = c("Non-responding", "Responding"))) %>%
+  filter(Patient.ID != "Pt8")
+
+fitB <- survfit(Surv(time_years, event) ~ resp_group, data = kmB_df)
+sdB  <- survdiff(Surv(time_years, event) ~ resp_group, data = kmB_df)
+pB   <- 1 - pchisq(sdB$chisq, df = 1)
+
+# Save (headless-safe)
+ragg::agg_png("figure_B.png", width = 6, height = 5, units = "in", res = 300)
+
+plot(
+  fitB,
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  mark.time = TRUE,
+  mark = 3,
+  xlab = "Survival (years)",
+  ylab = "Fraction surviving",
+  xlim = c(0, 6),
+  ylim = c(0, 1)
+)
+
+legend(
+  "topright",
+  title = "aPD-1 response",
+  legend = c("Non-responding", "Responding"),
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  bty = "n"
+)
+
+
+usr <- par("usr")
+text(
+  x = usr[1] + 0.75 * (usr[2] - usr[1]),
+  y = usr[3] + 0.25 * (usr[4] - usr[3]),
+  labels = paste0("p = ", format.pval(pB, digits = 2, eps = 1e-16))
+)
+
+dev.off()
+```
+Figure A TMB
+```{r, fig.width=5, fig.height=5, echo=FALSE}
+km_TMB <- final_plotting_df %>%
+  mutate(
+    Vital.Status = tolower(trimws(as.character(Vital.Status))),
+    Overall.Survival = as.numeric(Overall.Survival),
+    time_years = Overall.Survival / 365.25,   # <-- key fix (days -> years)
+    event = ifelse(Vital.Status == "dead", 1,
+                   ifelse(Vital.Status == "alive", 0, NA))
+  ) %>%
+  filter(!is.na(time_years), !is.na(event), !is.na(nsSNV))
+
+km_TMB <- km_TMB %>%
+  filter(Patient.ID != "Pt8")
+
+# tertiles on nsSNV
+q <- quantile(km_TMB$TMB, probs = c(1/3, 2/3), na.rm = TRUE)
+km_TMB <- km_TMB %>%
+  mutate(group = case_when(
+    TMB <= q[1] ~ "Bottom third",
+    TMB >= q[2] ~ "Top third",
+    TRUE ~ "Middle third"
+  )) %>%
+  filter(group %in% c("Top third", "Bottom third")) %>%
+  mutate(group = factor(group, levels = c("Top third", "Bottom third")))
+
+
+fit <- survfit(Surv(time_years, event) ~ group, data = km_TMB)
+sd  <- survdiff(Surv(time_years, event) ~ group, data = km_TMB)
+pval <- 1 - pchisq(sd$chisq, df = 1)
+
+plot(
+  fit,
+  col = c("red", "blue"),
+  lty = c(2, 3),
+  lwd = 2,
+  mark.time = TRUE,
+  mark = 3,
+  xlab = "Survival (years)",
+  ylab = "Fraction surviving",
+  xlim = c(0, 6),
+  ylim = c(0, 1)
+)
+
+legend(
+  "topright",
+  title = "nsSNV count",
+  legend = c("Top third", "Bottom third"),
+  pch = 15,
+  col = c("red", "blue"),
+  pt.cex = 1.5,
+  bty = "n"
+)
+
+text(4.6, 0.25, labels = paste0("p=", format.pval(pval, digits = 3, eps = 0.001)))
+```
+
+Overview cohort
+```{r}
+p_resp <- ggplot(final_plotting_df, aes(x = resp_group, fill = Vital.Status)) +
+  geom_bar(width = 0.7, alpha = 0.9) +
+  geom_text(
+    stat = "count",
+    aes(label = after_stat(count)),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 4) +
+  scale_fill_manual(
+    values = c(
+      "Alive" = "#F59F27",
+      "Dead"  = "#BFBABA")) +
+  labs(
+    title = "Cohort overview: response and survival",
+    x = NULL,
+    y = "Number of patients",
+    fill = "Vital status") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "right")
+
+# save to file
+ggsave(
+  filename = "cohort_overview_response_survival.png",
+  plot = p_resp,
+  width = 6,
+  height = 4,
+  dpi = 300
+)
+```
+Trial with IPRES to see if we could manually incoperate it with wes data
+```{r, echo=FALSE}
+Ipres_score <-read.csv("IPRES_scores.csv")
+Ipres_score <- Ipres_score %>% rename( "RNA_ID" = "Sample")
+clinical_df_og <- clinical_df_og %>% rename( "RNA_ID" = "SRA.Run.ID..tumor.RNA")
+
+Ipres_with_patient <- Ipres_score %>%
+  left_join(
+    clinical_df_og %>% select(RNA_ID, Patient.ID),
+    by = "RNA_ID"
+  )
+
+Ipres_vs_SNV <- Ipres_with_patient %>%
+  left_join(
+    final_plotting_df %>%
+      select(Patient.ID, nsSNV, all_nonsilent_vars, TMB),
+    by = "Patient.ID"
+  )
+
+Ipres_vs_SNV <- Ipres_vs_SNV %>%
+  filter(Patient.ID != "Pt8")
+```
+```{r}
+
+# If your current Ipres_vs_SNV still has duplicates, collapse to 1 row per patient
+plot_df <- Ipres_vs_SNV %>%
+  group_by(Patient.ID) %>%
+  summarise(
+    IPRES = mean(IPRES, na.rm = TRUE),   # <-- change if your column isn't named IPRES
+    nsSNV = max(nsSNV, na.rm = TRUE),
+    TMB   = max(TMB, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(is.finite(IPRES), is.finite(nsSNV), is.finite(TMB))
+
+p1 <- ggplot(plot_df, aes(x = nsSNV, y = IPRES)) +
+  geom_point(size = 2, alpha = 0.85) +
+  scale_x_log10() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "IPRES score vs non-synonymous SNV burden",
+    x = "nsSNV (log10)",
+    y = "IPRES score"
+  ) +
+  theme_minimal(base_size = 14)
+
+p1
+
+p2 <- ggplot(plot_df, aes(x = TMB, y = IPRES)) +
+  geom_point(size = 2, alpha = 0.85) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "IPRES score vs TMB",
+    x = "TMB (mutations/Mb)",
+    y = "IPRES score"
+  ) +
+  theme_minimal(base_size = 14)
+
+p2
+```
+Testing for important repetaty mutated genes
+```{r}
+ns_classes <- c(
+  "Missense_Mutation", "Nonsense_Mutation",
+  "Splice_Site", "Translation_Start_Site",
+  "Frame_Shift_Del", "Frame_Shift_Ins",
+  "In_Frame_Del", "In_Frame_Ins"
+)
+
+mut_df <- merged_maf@data %>%
+  filter(Variant_Classification %in% ns_classes) %>%
+  left_join(
+    final_plotting_df %>% select(Tumor_Sample_Barcode, Patient.ID, resp_group),
+    by = "Tumor_Sample_Barcode"
+  )
+
+# 1) presence/absence per patient per gene
+gene_patient <- mut_df %>%
+  distinct(Gene = Hugo_Symbol, Patient.ID, resp_group) %>%
+  filter(!is.na(resp_group))
+
+# 2) count mutated patients per gene per group (fill missing groups with 0)
+gene_counts <- gene_patient %>%
+  count(Gene, resp_group, name = "n_mut") %>%
+  tidyr::complete(Gene, resp_group, fill = list(n_mut = 0))
+
+# 3) group sizes
+group_sizes <- final_plotting_df %>%
+  distinct(Patient.ID, resp_group) %>%
+  count(resp_group, name = "n_total")
+
+# 4) wide format: one row per gene, with counts in each group
+# make mutation counts wide
+gene_wide_mut <- gene_counts %>%
+  mutate(resp_group = paste0(resp_group, "_mut")) %>%
+  pivot_wider(names_from = resp_group, values_from = n_mut)
+
+# make totals wide
+gene_wide_tot <- group_sizes %>%
+  mutate(resp_group = paste0(resp_group, "_tot")) %>%
+  pivot_wider(names_from = resp_group, values_from = n_total)
+
+# combine
+gene_wide2 <- gene_wide_mut %>%
+  left_join(gene_wide_tot, by = character())
+
+# check column names
+names(gene_wide2)
+gene_wide2 <- gene_wide2 %>%
+  rename(
+    mut_R  = `Responding_mut`,
+    mut_NR = `Non-responding_mut`,
+    tot_R  = `Responding_tot`,
+    tot_NR = `Non-responding_tot`
+  )
+```
+
+```{r}
+library(purrr)
+
+fisher_tbl <- gene_wide2 %>%
+  rowwise() %>%
+  mutate(
+    p = fisher.test(matrix(
+      c(mut_R,  tot_R - mut_R,
+        mut_NR, tot_NR - mut_NR),
+      nrow = 2, byrow = TRUE
+    ))$p.value
+  ) %>%
+  ungroup() %>%
+  mutate(p_adj = p.adjust(p, method = "fdr"))
+
+sig_genes <- fisher_tbl %>%
+  mutate(
+    freq_R  = mut_R / tot_R,
+    freq_NR = mut_NR / tot_NR,
+    diff = abs(freq_R - freq_NR)
+  ) %>%
+  arrange(desc(diff), p) %>%
+  slice_head(n = 40) %>%
+  pull(Gene)
+```
+
+```{r}
+patient_anno <- final_plotting_df %>%
+  group_by(Patient.ID) %>%
+  summarise(
+    resp_group = first(resp_group),
+    nsSNV = max(nsSNV, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+onc_df <- gene_patient %>%
+  filter(Gene %in% sig_genes) %>%
+  mutate(Mutated = 1L) %>%
+  select(Gene, Patient.ID, Mutated) %>%
+  distinct() %>%
+  tidyr::complete(Gene, Patient.ID, fill = list(Mutated = 0L)) %>%
+  left_join(patient_anno, by = "Patient.ID")
+
+patient_order <- onc_df %>%
+  distinct(Patient.ID, resp_group, nsSNV) %>%
+  arrange(resp_group, desc(nsSNV)) %>%
+  pull(Patient.ID)
+
+onc_df <- onc_df %>%
+  mutate(
+    Patient.ID = factor(Patient.ID, levels = patient_order),
+    Gene = factor(Gene, levels = rev(sig_genes))  # top gene appears at top
+  )
+```
+
+```{r}
+p_onco <- ggplot(onc_df, aes(x = Patient.ID, y = Gene, fill = factor(Mutated))) +
+  geom_tile(color = "white", linewidth = 0.25) +
+  scale_fill_manual(
+    values = c("0" = "white", "1" = "black"),
+    guide = "none"
+  ) +
+  facet_grid(. ~ resp_group, scales = "free_x", space = "free_x") +
+  labs(
+    title = "Recurrent non-silent mutations by response group",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    panel.grid = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+
+ggsave(
+  filename = "mutations_response_groups.png",
+  plot = p_onco,
+  width = 12,     
+  height = 6,
+  dpi = 300
+)
+
+
+```
+
+```{r}
+genes_mutated <- onc_df |>
+  dplyr::filter(Mutated == 1) |>
+  dplyr::pull(Gene) |>
+  unique()
+genes_mutated
+```
+

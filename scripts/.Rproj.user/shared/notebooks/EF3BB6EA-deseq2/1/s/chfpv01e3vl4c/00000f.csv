@@ -1,0 +1,6 @@
+"0","res_shrunk <- lfcShrink("
+"0","  dds_bin,"
+"0","  coef = ""response_bin_Responder_vs_Progressive"","
+"0","  type = ""ashr"""
+"0",")"
+"0",""

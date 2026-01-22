@@ -1,0 +1,24 @@
+{
+    "id": "A7618862",
+    "path": "/rds/projects/e/elhamsak-group5/main_project/genomics_analysis/aish_analysis/aish_analysis.Rmd",
+    "project_path": null,
+    "type": "r_markdown",
+    "hash": "4149212790",
+    "contents": "",
+    "dirty": false,
+    "created": 1768547919655.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1768546306,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1768546306,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,325 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+---
+title: "Genomics Analysis"
+output: html_notebook
+---
+```{r}
+install.packages("BiocManager")
+BiocManager::install("maftools")
+```
+LOADING LIBRARIES:
+```{r}
+library(maftools)
+```
+
+```{r}
+# ---- Read clinical data ----
+clinical_df <- read.csv("../mmc1.csv", stringsAsFactors = FALSE)
+
+# RENAME the ID column to match the MAF requirement
+# Check your CSV; if the column is 'Sample.ID', use that name here:
+colnames(clinical_df)[colnames(clinical_df) == "SRA.Run.ID..tumor.WES"] <- "Tumor_Sample_Barcode"
+colnames(clinical_df)[colnames(clinical_df) == "SRA.Run.ID..normal.WES"] <- "Matched_Norm_Sample_Barcode"
+
+```
+
+MERGING DATA: 
+```{r}
+
+library(maftools)
+library(dplyr)
+
+# 1. Define the two directories
+ucla_dir <- "/rds/projects/e/elhamsak-group5/main_project/annotation/ucla_processed_bed"
+vandy_dir <- "/rds/projects/e/elhamsak-group5/main_project/annotation/vanderbilt_processed_bed" 
+
+# ---- Collect all MAF files ----
+maf_files <- c(
+  list.files(ucla_dir,  pattern = "\\.maf$", full.names = TRUE),
+  list.files(vandy_dir, pattern = "\\.maf$", full.names = TRUE)
+)
+
+cat("Total MAF files found:", length(maf_files), "\n")
+
+# ---- Process each MAF ----
+all_mafs_list <- lapply(maf_files, function(file_path) {
+  
+  dat <- read.delim(file_path, comment.char = "#", stringsAsFactors = FALSE)
+  
+  # Extract both IDs from filename
+  fname <- basename(file_path)
+  # removes everything starting from the first dot and split by "_vs_"
+  ids <- unlist(strsplit(clean_name <- gsub("\\..*", "", fname), "_vs_"))
+  
+  tumor_id  <- ids[1]
+  normal_id <- ids[2]
+  
+  # Replace BOTH barcodes
+  dat$Tumor_Sample_Barcode  <- tumor_id
+  dat$Matched_Norm_Sample_Barcode <- normal_id
+  
+  # Track cohort source
+  dat$Cohort <- ifelse(grepl("UCLA", file_path),
+                       "UCLA",
+                       "VANDERBILT")
+  
+  return(dat)
+})
+
+# ---- Merge ----
+combined_df <- do.call(rbind, all_mafs_list)
+
+cat("Total variants after merge:", nrow(combined_df), "\n")
+
+# ---- Build MAF object ----
+merged_maf <- read.maf(maf = combined_df,
+                       clinicalData = clinical_df)
+
+```
+```{r}
+# Extract mutation data to a standard data.frame
+maf_df <- as.data.frame(merged_maf@data)
+
+# Extract clinical data to a standard data.frame
+clin_df <- as.data.frame(getClinicalData(merged_maf))
+
+maf_with_patient <- maf_df %>%
+  left_join(
+    clin_df %>% select(Tumor_Sample_Barcode, Patient.ID),
+    by = "Tumor_Sample_Barcode"
+  )
+```
+
+```{r}
+unique(maf_df$Variant_Type)
+```
+
+```{r}
+library(dplyr)
+ns_classes <- c(
+  "Missense_Mutation",
+  "Nonsense_Mutation",
+  "Nonstop_Mutation",
+  "Splice_Site",
+  "Translation_Start_Site"
+)
+
+nonsilent_classes <- c(
+  ns_classes,
+  "Frame_Shift_Del", "Frame_Shift_Ins",
+  "In_Frame_Del", "In_Frame_Ins"
+)
+
+```
+```{r}
+library(dplyr)
+
+# 1. Calculate SNP-only counts (nsSNV)
+snp_counts <- maf_df %>%
+  filter(Variant_Type == "SNP", 
+         Variant_Classification %in% ns_classes) %>%
+  count(Tumor_Sample_Barcode, name = "nsSNV_SNP")
+
+# 2. Calculate All Non-silent counts (Includes Indels)
+all_nonsilent_counts <- maf_df %>%
+  filter(Variant_Classification %in% nonsilent_classes) %>%
+  count(Tumor_Sample_Barcode, name = "nsSNV_all")
+# 
+# # 3. Combine everything with Patient.ID
+# nsSNV_by_sample <- snp_counts %>%
+#   left_join(all_nonsilent_counts, by = "Tumor_Sample_Barcode") %>%
+#   left_join(clin_df %>% select(Tumor_Sample_Barcode, Patient.ID), by = "Tumor_Sample_Barcode") %>%
+#   select(Patient.ID, Tumor_Sample_Barcode, nsSNV_SNP, nsSNV_all) %>%
+#   arrange(desc(nsSNV_SNP))
+# 
+# # View results
+# head(nsSNV_by_sample, 20)
+# 
+# library(dplyr)
+
+# 1. Load the author's data
+# (Assuming the file is in your working directory)
+author_data <- read.csv("../Snv_counts.csv", stringsAsFactors = FALSE)
+
+# Note: If read.csv didn't change the name automatically, 
+# we can rename it manually to ensure the join works:
+if("Patient.ID" %in% colnames(author_data) == FALSE & "Patient.ID" %in% colnames(author_data) == FALSE){
+   # This handles cases where the column might be 'Patient.ID' or 'Patient.ID'
+   author_data <- author_data %>% rename(Patient.ID = Patient.ID) 
+}
+
+# 2. Update your existing nsSNV_by_sample table
+nsSNV_by_sample <- snp_counts %>%
+  # Join your calculated SNP counts
+  left_join(all_nonsilent_counts, by = "Tumor_Sample_Barcode") %>%
+  # Join your clinical mapping to get Patient.ID
+  left_join(clin_df %>% select(Tumor_Sample_Barcode, Patient.ID), by = "Tumor_Sample_Barcode") %>%
+  # Join the author's original values from the CSV
+  left_join(author_data %>% select(Patient.ID, TotalNonSyn, TotalNonSyn_Exp), by = "Patient.ID") %>%
+  # Organize and sort
+  select(Patient.ID, Tumor_Sample_Barcode, nsSNV_SNP, nsSNV_all, auth_TotalNonSyn=TotalNonSyn, auth_TotalNonSyn_Exp=TotalNonSyn_Exp) %>%
+  arrange(desc(nsSNV_SNP))
+
+# View the comparison
+head(nsSNV_by_sample, 20)
+
+# need to add TotalNonSyn,TotalNonSyn_Exp from Snv_counts.csv
+```
+```{r}
+library(GenomicRanges)
+library(rtracklayer)
+```
+
+```{r}
+
+bed_file <- "/rds/projects/e/elhamsak-group5/main_project/reference_genome/Twist_Exome_Core_hg38_padded.bed"
+
+gr <- import(bed_file)      # GRanges
+gr_red <- reduce(gr)        # merge overlaps
+capture_bp <- sum(width(gr_red))
+capture_mb <- capture_bp / 1e6
+
+capture_mb
+```
+```{r}
+nsSNV_by_sample <- nsSNV_by_sample %>%
+  mutate(
+    TMB_all = nsSNV_all / capture_mb,
+    TMB_SNP = nsSNV_SNP / capture_mb
+  )
+
+head(nsSNV_by_sample, 20)
+```
+```{r}
+colnames(clin_df)
+# add more meta data to df
+clin_subset <- clin_df %>%
+  select(
+    Tumor_Sample_Barcode,
+    Age, Gender, Disease.Status, Overall.Survival, Vital.Status
+  ) 
+snv_with_clin <- nsSNV_by_sample %>%
+  left_join(clin_subset, by = "Tumor_Sample_Barcode")
+
+```
+
+```{r}
+head(snv_patient)
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+
+
+snv_patient <- snv_with_clin %>%
+  mutate(Patient.ID = as.character(Patient.ID)) %>%
+  group_by(Patient.ID) %>%
+  slice_head(n = 1) %>%
+  ungroup()
+
+# --- 0) Make sure you have ONE row per patient ---
+# If you already have a patient-level table, skip this.
+library(ggplot2)
+
+dfp <- snv_patient %>%
+  mutate(
+    OS_time = as.numeric(Overall.Survival),
+    OS_event = case_when(
+      Vital.Status %in% c("Dead", "DEAD", "Deceased", "1", 1) ~ 1,
+      Vital.Status %in% c("Alive", "ALIVE", "0", 0) ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  filter(!is.na(OS_time))
+
+
+
+# Quick check what labels you have:
+table(dfp$Vital.Status, useNA = "ifany")
+table(dfp$OS_event, useNA = "ifany")
+summary(dfp$OS_time)
+
+# --- 2) Scatter: TMB vs survival time ---
+p1 <- ggplot(dfp, aes(x = TMB_all, y = OS_time)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "TMB (non-syn mutations / Mb)",
+       y = "Overall survival time",
+       title = "TMB vs Overall Survival")
+
+ggsave("TMB_vs_OS.png", plot = p1, width = 6, height = 4, dpi = 300)
+
+# --- 3) Scatter: nsSNV count vs survival time ---
+p2 <-ggplot(dfp, aes(x = nsSNV_all, y = OS_time)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "Non-syn mutation count (all non-silent)",
+       y = "Overall survival time",
+       title = "Non-syn mutation count vs Overall Survival")
+
+ggsave("nsSNV_all_vs_OS.png", plot = p2, width = 6, height = 4, dpi = 300)
+
+# --- 4) Box+Jitter: TMB by vital status ---
+p3 <-ggplot(dfp %>% filter(!is.na(OS_event)),
+       aes(x = factor(OS_event, labels = c("Alive/Censored","Dead")), y = TMB_all)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, height = 0) +
+  labs(x = "Vital status",
+       y = "TMB (non-syn mutations / Mb)",
+       title = "TMB by Vital Status")
+
+ggsave("TMB_all_vs_vitality.png", plot = p3, width = 6, height = 4, dpi = 300)
+# --- 5) Box+Jitter: nsSNV count by vital status ---
+p4 <-ggplot(dfp %>% filter(!is.na(OS_event)),
+       aes(x = factor(OS_event, labels = c("Alive/Censored","Dead")), y = nsSNV_all)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, height = 0) +
+  labs(x = "Vital status",
+       y = "Non-syn mutation count (all non-silent)",
+       title = "Non-syn mutation count by Vital Status")
+ggsave("nssnv_all_vs_vitality.png", plot = p4, width = 6, height = 4, dpi = 300)
+```
+
+```{r}
+library(survival)
+# install.packages("survminer") if needed
+library(survminer)
+
+dfkm <- dfp %>% filter(!is.na(OS_event))
+
+dfkm <- dfkm %>%
+  mutate(
+    TMB_group = ifelse(TMB_all >= median(TMB_all, na.rm = TRUE), "High", "Low"),
+    ns_group  = ifelse(nsSNV_all >= median(nsSNV_all, na.rm = TRUE), "High", "Low")
+  )
+
+# KM: TMB
+fit_tmb <- survfit(Surv(OS_time, OS_event) ~ TMB_group, data = dfkm)
+ggsurvplot(fit_tmb, data = dfkm, pval = TRUE, risk.table = TRUE)
+
+# KM: nsSNV count
+fit_ns <- survfit(Surv(OS_time, OS_event) ~ ns_group, data = dfkm)
+ggsurvplot(fit_ns, data = dfkm, pval = TRUE, risk.table = TRUE)
+```
+
+
+```{r}
+# Check clinical data summary
+getSampleSummary(merged_maf)
+```
+```{r}
+# Filter clinical data for this sample
+sample_clinical <- subset(getClinicalData(merged_maf), Matched_Norm_Sample_Barcode == "SRR4289724")
+print(sample_clinical)
+```
+```{r}
+# Get the summary table
+sample_load <- getSampleSummary(merged_maf)
+
+# View the table
+# 'total' is your non-synonymous count
+print(sample_load[, .(Tumor_Sample_Barcode, total)])
+

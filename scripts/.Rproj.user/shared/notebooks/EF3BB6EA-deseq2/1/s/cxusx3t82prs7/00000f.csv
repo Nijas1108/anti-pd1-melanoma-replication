@@ -1,0 +1,7 @@
+"0","library(GSEABase)"
+"0","library(GSVA)"
+"0","library(msigdbr)"
+"0",""
+"0","msig <- msigdbr(species = ""Homo sapiens"", category = ""H"")"
+"0","hallmark <- split(msig$gene_symbol, msig$gs_name)"
+"0",""

@@ -1,0 +1,7 @@
+"0","gene_sample_counts <- maf@data |>"
+"0","  dplyr::select(Hugo_Symbol, Tumor_Sample_Barcode) |>"
+"0","  dplyr::distinct() |>"
+"0","  dplyr::count(Hugo_Symbol, name = ""n_samples_mutated"") |>"
+"0","  dplyr::arrange(desc(n_samples_mutated))"
+"0",""
+"0","head(gene_sample_counts, 20)"

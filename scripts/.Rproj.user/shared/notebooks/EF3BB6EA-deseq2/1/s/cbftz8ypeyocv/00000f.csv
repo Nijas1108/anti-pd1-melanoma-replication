@@ -1,0 +1,2 @@
+"0","top_paths <- topTable(fit, coef = ""response_binResponder"", number = 20)"
+"0","top_paths"

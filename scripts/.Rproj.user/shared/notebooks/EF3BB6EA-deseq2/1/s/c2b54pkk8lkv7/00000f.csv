@@ -1,0 +1,5 @@
+"0","if (!requireNamespace(""ashr"", quietly = TRUE)) {"
+"0","  install.packages(""ashr"")"
+"0","}"
+"0","library(ashr)"
+"0",""

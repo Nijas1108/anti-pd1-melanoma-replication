@@ -1,0 +1,7 @@
+"0","nsSNV_by_sample <- nsSNV_by_sample %>%"
+"0","  mutate("
+"0","    TMB_all = nsSNV_all / capture_mb,"
+"0","    TMB_SNP = nsSNV_SNP / capture_mb"
+"0","  )"
+"0",""
+"0","head(nsSNV_by_sample, 20)"

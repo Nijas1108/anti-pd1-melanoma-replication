@@ -1,0 +1,8 @@
+"0","dds_bin <- DESeqDataSetFromMatrix("
+"0","  countData = count_matrix[keep, ],"
+"0","  colData   = meta_min,"
+"0","  design    = ~ response_bin"
+"0",")"
+"0",""
+"0","dds_bin <- DESeq(dds_bin)"
+"0",""

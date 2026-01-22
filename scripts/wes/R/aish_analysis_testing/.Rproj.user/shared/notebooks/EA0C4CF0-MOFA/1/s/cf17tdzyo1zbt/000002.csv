@@ -1,0 +1,28 @@
+"1","
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShwaGVhdG1hcClcblxuIyBDbHVzdGVyIHNhbXBsZXMgKGNvbHVtbnMpIGFuZCBnZW5lcyAocm93cylcbnBoZWF0bWFwKG11dF9tYXQsIFxuICAgICAgICAgY2x1c3RlcmluZ19kaXN0YW5jZV9yb3dzID0gXCJiaW5hcnlcIiwgXG4gICAgICAgICBjbHVzdGVyaW5nX2Rpc3RhbmNlX2NvbHMgPSBcImJpbmFyeVwiLCBcbiAgICAgICAgIGNvbG9yID0gYyhcIndoaXRlXCIsIFwiZmlyZWJyaWNrXCIpLCBcbiAgICAgICAgIHNob3dfY29sbmFtZXMgPSBGQUxTRSxcbiAgICAgICAgIG1haW4gPSBcIlBhdGllbnQgTXV0YXRpb24gQ2x1c3RlcnNcIilcbmBgYCJ9 -->
+
+```r
+library(pheatmap)
+
+# Cluster samples (columns) and genes (rows)
+pheatmap(mut_mat, 
+         clustering_distance_rows = \"binary\", 
+         clustering_distance_cols = \"binary\", 
+         color = c(\"white\", \"firebrick\"), 
+         show_colnames = FALSE,
+         main = \"Patient Mutation Clusters\")
+```
+
+<!-- rnb-source-end -->
+"
+"0","```r
+library(pheatmap)
+
+# Cluster samples (columns) and genes (rows)
+pheatmap(mut_mat, 
+         clustering_distance_rows = \"binary\", 
+         clustering_distance_cols = \"binary\", 
+         color = c(\"white\", \"firebrick\"), 
+         show_colnames = FALSE,
+         main = \"Patient Mutation Clusters\")
+```"

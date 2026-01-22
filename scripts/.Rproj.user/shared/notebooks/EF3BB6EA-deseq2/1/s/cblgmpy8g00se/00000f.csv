@@ -1,0 +1,6 @@
+"0","keep <- rowSums(count_matrix >= 10) >= ceiling(0.1 * ncol(count_matrix))"
+"0","sum(keep)     # number of genes kept"
+"1","[1]"
+"1"," 29127"
+"1","
+"
