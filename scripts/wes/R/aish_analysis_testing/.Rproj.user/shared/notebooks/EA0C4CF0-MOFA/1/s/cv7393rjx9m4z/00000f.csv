@@ -1,2 +1,0 @@
-"0","# Statistical test for somatic interactions"
-"0","somatic_interactions <- somaticInteractions(maf = maf_filt, genes = genes_keep, pvalue = c(0.05, 0.1))"

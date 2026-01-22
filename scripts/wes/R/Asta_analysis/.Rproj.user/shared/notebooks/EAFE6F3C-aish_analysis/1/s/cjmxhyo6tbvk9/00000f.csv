@@ -1,7 +1,0 @@
-"0","# Quick validation check"
-"0","plot(fig1c_df$nsSNV, fig1c_df$TotalNonSyn, "
-"0","     xlab=""My Calculation"", ylab=""Author Calculation"", "
-"0","     main=""Validation of SNV Counts"")"
-"2","Error in .External2(C_X11, paste0(""png::"", filename), g$width, g$height,  : 
-  unable to start device PNG
-"

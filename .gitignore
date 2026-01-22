@@ -41,3 +41,6 @@ __pycache__/
 *.Rproj
 
 
+
+.Rproj.user/
+*.Rproj

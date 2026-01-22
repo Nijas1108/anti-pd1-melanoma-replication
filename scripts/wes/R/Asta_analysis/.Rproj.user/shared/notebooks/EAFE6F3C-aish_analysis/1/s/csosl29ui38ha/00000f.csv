@@ -1,4 +1,0 @@
-"0","# Filter clinical data for sample SRR4289724"
-"0","sample_clinical <- subset(getClinicalData(merged_maf),"
-"0","                          Matched_Norm_Sample_Barcode == ""SRR4289724"")"
-"0","print(sample_clinical)"

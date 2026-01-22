@@ -1,6 +1,0 @@
-"0","#contains all VCF data"
-"0","merged_maf <- readRDS(""/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/merged_maf.rds"") "
-"0","# has patient.id and tumor_sample_barcode, survival, resposne etc"
-"0","clinical_df_og <-read.csv(""/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/mmc1.csv"", stringsAsFactors = FALSE)"
-"0","# has paper SNV counts for validation"
-"0","author_data <- read.csv(""/rds/projects/e/elhamsak-group5/main_project/scripts/wes/R/Snv_counts.csv"", stringsAsFactors = FALSE)"

@@ -1,2 +1,0 @@
-"0","library(maftools)"
-"0","maf <- readRDS(""merged_maf.rds"") "

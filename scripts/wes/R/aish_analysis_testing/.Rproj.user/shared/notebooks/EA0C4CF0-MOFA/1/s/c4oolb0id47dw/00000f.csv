@@ -1,8 +1,0 @@
-"0","# Load the datasets"
-"0","ipres_df <- read.csv(""IPRES_scores.csv"", row.names = 1) "
-"0","rna_df   <- read.csv(""normalized_counts_DESeq2.csv"", row.names = 1)"
-"0",""
-"0","# Check: In MOFA, features (genes/signatures) should be rows and samples should be columns."
-"0","# If your samples are currently rows, transpose them:"
-"0","ipres_df <- t(ipres_df)"
-"0","# rna_df   <- t(rna_df)"

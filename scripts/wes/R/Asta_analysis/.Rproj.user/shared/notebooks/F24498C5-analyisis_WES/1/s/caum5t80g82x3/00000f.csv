@@ -1,6 +1,0 @@
-"0","#Rename colums in clinicaldf"
-"0","clinical_df_og <- clinical_df_og %>%"
-"0","  rename("
-"0","    ""Tumor_Sample_Barcode"" = ""SRA.Run.ID..tumor.WES"","
-"0","    ""Matched_Norm_Sample_Barcode"" = ""SRA.Run.ID..normal.WES"""
-"0","  )"

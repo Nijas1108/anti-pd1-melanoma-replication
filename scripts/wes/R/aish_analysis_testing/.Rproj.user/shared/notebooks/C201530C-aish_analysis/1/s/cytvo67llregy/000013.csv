@@ -1,5 +1,0 @@
-"0","# Save as an RDS file for R"
-"0","saveRDS(merged_maf, file = ""/rds/projects/e/elhamsak-group5/main_project/genomics_analysis/aish_analysis/merged_maf.rds"")"
-"0",""
-"0","# open in Vlab with: "
-"0","# merged_df <- readRDS(""P:/my_folder/merged_df.rds"") # 'P:' is often the mapped RDS drive"
