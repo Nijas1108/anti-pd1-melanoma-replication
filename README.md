@@ -74,6 +74,12 @@ Due to size and data governance considerations, the following are **not included
 
 All results can be reproduced using the provided scripts.
 
+For an overview of the analysis, methodology, and interpretation of results, please refer to the presentation included in this repository:
+
+`presentation/class_presentation.pdf`
+
+This presentation summarizes the biological context, analytical approach, and key findings derived from the RNA-seq and WES analyses.
+
 ---
 
 ## Data Availability
