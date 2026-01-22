@@ -8,7 +8,7 @@ The project reproduces and explores key RNA-seq and whole-exome sequencing (WES)
 
 ---
 
-## 📌 Project Objectives
+## Project Objectives
 
 - Reproduce key transcriptomic and genomic analyses from a landmark melanoma immunotherapy study
 - Implement an end-to-end RNA-seq and WES analysis pipeline
@@ -18,32 +18,31 @@ The project reproduces and explores key RNA-seq and whole-exome sequencing (WES)
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
+```text
 .
 ├── scripts/
-│ ├── rnaseq/ # RNA-seq processing & DE analysis
-│ │ ├── bash/ # FASTQ → counts pipeline
-│ │ └── R/ # DESeq2 & downstream analysis
-│ └── wes/
-│ ├── bash/ # Alignment, variant calling, annotation
-│ └── R/ # WES downstream analyses
+│   ├── rnaseq/            # RNA-seq processing & DE analysis
+│   │   ├── bash/          # FASTQ → counts pipeline
+│   │   └── R/             # DESeq2 & downstream analysis
+│   └── wes/
+│       ├── bash/          # Alignment, variant calling, annotation
+│       └── R/             # WES downstream analyses
 │
 ├── figures/
-│ ├── rnaseq/ # RNA-seq plots
-│ └── wes/ # WES plots
+│   ├── rnaseq/            # RNA-seq plots
+│   └── wes/               # WES plots
 │
 ├── presentation/
-│ └── class_presentation.pdf
+│   └── class_presentation.pdf
 │
 ├── .gitignore
-├── README.md
-└── CONTRIBUTORS.md
-
+└── README.md
 
 ---
 
-## 🧬 Analysis Overview
+## Analysis Overview
 
 ### RNA-seq Workflow
 1. Data download from public repositories
@@ -62,7 +61,7 @@ The project reproduces and explores key RNA-seq and whole-exome sequencing (WES)
 
 ---
 
-## 📊 Results
+## Results
 
 This repository contains **summary-level outputs and visualizations only**.
 
@@ -76,7 +75,7 @@ All results can be reproduced using the provided scripts.
 
 ---
 
-## 📦 Data Availability
+## Data Availability
 
 Raw data were obtained from publicly available datasets referenced in the original publication.
 
@@ -86,10 +85,9 @@ Download scripts are provided in:
 scripts/rnaseq/bash/
 scripts/wes/bash/
 
-
 ---
 
-## 🧪 Reproducibility
+## Reproducibility
 
 This project was developed and executed on an HPC environment.
 
@@ -99,21 +97,27 @@ This project was developed and executed on an HPC environment.
 - featureCounts
 - GATK (Mutect2, Funcotator)
 - R (DESeq2, ggplot2)
+- CIBERSORTx 
 - Bash scripting
 
 The repository is structured to allow full reproduction of results given access to the raw data.
 
 ---
 
-## 👥 Contributors
+## Contributors
 
-See [`CONTRIBUTORS.md`](CONTRIBUTORS.md)
 
-All contributors contributed equally to this project.
+This project was completed as a collaborative class assignment.
+
+- **Aishwarya Padmanaban** — WES pipeline development and variant interpretation  
+- **Asta Perl** — WES pipeline development and variant interpretation  
+- **Aman Kumar** — RNA-seq pipeline development and analysis
+
+All contributors participated equally in the design and execution of this project.
 
 ---
 
-## 📚 Notes
+## Notes
 
 - This repository was created as part of an MSc-level genomics and bioinformatics course.
 - The project may be extended in future work to include:
@@ -123,15 +127,16 @@ All contributors contributed equally to this project.
 
 ---
 
-## 📎 Citation
+## Citation
 
 If using or referencing this work, please cite the original study:
 
-> Genomic and Transcriptomic Features of Response to Anti–PD-1 Therapy in Metastatic Melanoma
+> Hugo et al., Cell, 2016. Genomic and Transcriptomic Features of Response to Anti–PD-1 Therapy in Metastatic Melanoma
+> https://www.cell.com/cell/fulltext/S0092-8674(16)30215-X?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS009286741630215X%3Fshowall%3Dtrue
 
 ---
 
-## 🔒 Disclaimer
+## Disclaimer
 
 This repository is intended for educational and research purposes only.  
 No clinical decisions should be made based on the contents of this repository.
